@@ -1,0 +1,13 @@
+- [User Profile](user_profile.md) — Reo Akutsu, ex-JPM FIG / McKinsey, Point72 analyst candidate
+- [Point72 選考ステータス](project_point72_status.md) — モデルテスト合格、現フェーズ=ストックピッチ準備、次=面談
+- [Point72 Stock Pitch](project_point72_stock_pitch.md) — 4ペアトレード（明電舎/東北電力、ソニーFG/野村HD、TOWA/Sansan、SMS/リクルート）資料作成済 — メイン作業
+- [Point72 モデルテスト Playbook](reference_point72_model_test_playbook.md) — 63ステップ手順書アーカイブ（合格済・参照用）
+- [Trading Bot Project](reference_trading_bot.md) — Vultr稼働中だがBinance TRD_GRP_008制限でUSDT取引不可→戦略JPY化改修必要
+- [McK PPT Shortcut](project_mck_ppt_shortcut.md) — PowerPoint add-in v1完成、編集or販売の可能性
+- [Horikoshi Phytech 起業](project_horikoshi_phytech.md) — 後輩と起業準備、4/11戦略会議→以降は宿題対応
+- [Response Style](feedback_response_style.md) — During test: formula-first, minimal explanation, speed priority
+- [McK PS Framework](feedback_mck_ps_framework.md) — Always use McKinsey PS methodology: PSW→IA→SCR→Pyramid
+- [Slide Design](feedback_slide_design.md) — McKinsey-style: action titles, left chart + right insight, navy blue, minimal
+- [ストックピッチのスタイル](feedback_pitch_style.md) — Variant Perception必須、Surface Bear→隠し玉3-5個で反撃の構造
+- [Verify Before Claim](feedback_verify_before_claim.md) — デプロイ/稼働は実行コマンド出力で証明してから報告する
+- [Trading Research](reference_trading_research.md) — 2026-04-09作成の収益戦略リサーチ at C:\trading-bot\research\
