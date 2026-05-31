@@ -1,5 +1,7 @@
 - [User Profile](user_profile.md) — Reo Akutsu, ex-JPM FIG / McKinsey, Point72 analyst candidate
 - [転職先候補 一覧](project_job_search.md) — Point72（選考進行中）＋Camphora/Kaname（面接準備中）＋AVI/Strategic Capital（参照）の階層別管理
+- [Camphora 選考ステータス](project_camphora_status.md) — 日本株エンゲージメント型ファンド、面接準備中・詳細ヒアリング待ち
+- [Kaname（要）選考ステータス](project_kaname_status.md) — 日本株エンゲージメント型ファンド、面接準備中・詳細ヒアリング待ち
 - [Point72 選考ステータス](project_point72_status.md) — モデルテスト合格、現フェーズ=ストックピッチ準備、次=面談
 - [Point72 Stock Pitch](project_point72_stock_pitch.md) — 4ペアトレード（明電舎/東北電力、ソニーFG/野村HD、TOWA/Sansan、SMS/リクルート）資料作成済 — メイン作業
 - [Point72 モデルテスト Playbook](reference_point72_model_test_playbook.md) — 63ステップ手順書アーカイブ（合格済・参照用）
