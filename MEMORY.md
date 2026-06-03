@@ -1,10 +1,10 @@
-- [User Profile](user_profile.md) — Reo Akutsu, ex-JPM FIG / McKinsey, Point72 analyst candidate
-- [転職先候補 一覧](project_job_search.md) — Point72（選考進行中）＋Camphora/Kaname（面接準備中）＋AVI/Strategic Capital（参照）の階層別管理
+- [User Profile](user_profile.md) — Reo Akutsu, ex-JPM FIG / McKinsey, バイサイド転職活動中
+- [転職先候補 一覧](project_job_search.md) — Point72（❌不合格）／Camphora・Kaname（面接準備中=現メイン）／AVI・Strategic Capital（参照）
 - [Camphora 選考ステータス](project_camphora_status.md) — 日本株エンゲージメント型ファンド、面接準備中・詳細ヒアリング待ち
 - [Kaname（要）選考ステータス](project_kaname_status.md) — 日本株エンゲージメント型ファンド、面接準備中・詳細ヒアリング待ち
-- [Point72 選考ステータス](project_point72_status.md) — モデルテスト合格、現フェーズ=ストックピッチ準備、次=面談
-- [Point72 Stock Pitch](project_point72_stock_pitch.md) — 4ペアトレード（明電舎/東北電力、ソニーFG/野村HD、TOWA/Sansan、SMS/リクルート）資料作成済 — メイン作業
-- [Point72 モデルテスト Playbook](reference_point72_model_test_playbook.md) — 63ステップ手順書アーカイブ（合格済・参照用）
+- [Point72 選考ステータス](project_point72_status.md) — ❌不合格（2026-06-03）・選考終了・アーカイブ
+- [Point72 Stock Pitch](project_point72_stock_pitch.md) — 4ペアトレード資料（アーカイブ・他社で再利用可）
+- [Point72 モデルテスト Playbook](reference_point72_model_test_playbook.md) — 63ステップ手順書アーカイブ（他社でも再利用可）
 - [Trading Bot Project](reference_trading_bot.md) — Vultr稼働中だがBinance TRD_GRP_008制限でUSDT取引不可→戦略JPY化改修必要
 - [McK PPT Shortcut](project_mck_ppt_shortcut.md) — PowerPoint add-in v1完成、編集or販売の可能性
 - [Horikoshi Phytech 起業](project_horikoshi_phytech.md) — 後輩と起業準備、4/11戦略会議→以降は宿題対応
