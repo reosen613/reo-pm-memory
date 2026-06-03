@@ -1,7 +1,6 @@
 - [User Profile](user_profile.md) — Reo Akutsu, ex-JPM FIG / McKinsey, バイサイド転職活動中
-- [転職先候補 一覧](project_job_search.md) — Point72（❌不合格）／Camphora・Kaname（面接準備中=現メイン）／AVI・Strategic Capital（参照）
-- [Camphora 選考ステータス](project_camphora_status.md) — 日本株エンゲージメント型ファンド、面接準備中・詳細ヒアリング待ち
-- [Kaname（要）選考ステータス](project_kaname_status.md) — 日本株エンゲージメント型ファンド、面接準備中・詳細ヒアリング待ち
+- [転職先候補 一覧](project_job_search.md) — 複数ファンド同時進行。Pantheum(日曜テスト)・Oasis(手応え良)・Kaname・シティインデックス等／Point72・Davidson Kempnerは不合格
+- [Kaname Capital 選考ステータス](project_kaname_status.md) — 米ボストン本社エンゲージメント型ファンド（旧"Camphora"の正体）、XG Partners経由・面接来週
 - [Point72 選考ステータス](project_point72_status.md) — ❌不合格（2026-06-03）・選考終了・アーカイブ
 - [Point72 Stock Pitch](project_point72_stock_pitch.md) — 4ペアトレード資料（アーカイブ・他社で再利用可）
 - [Point72 モデルテスト Playbook](reference_point72_model_test_playbook.md) — 63ステップ手順書アーカイブ（他社でも再利用可）
