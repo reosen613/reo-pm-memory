@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>名刺管理 — Meishi</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🗂️</span>
+      <h1>名刺管理</h1>
+    </div>
+    <div class="search">
+      <input id="search" type="search" placeholder="名前・会社・役職・メールで検索…" autocomplete="off" />
+    </div>
+    <div class="actions">
+      <button id="addBtn" class="btn primary">＋ 名刺を追加</button>
+      <div class="menu">
+        <button id="menuBtn" class="btn ghost" aria-label="メニュー">⋯</button>
+        <div id="menuPanel" class="menu-panel hidden">
+          <button id="exportBtn">バックアップを書き出す（JSON）</button>
+          <button id="importBtn">バックアップを読み込む（JSON）</button>
+          <button id="resetBtn" class="danger">サンプルデータに戻す</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <nav class="filters">
+    <div id="companyChips" class="chips"></div>
+    <div class="toolbar">
+      <label class="fav-toggle">
+        <input type="checkbox" id="favOnly" /> お気に入りのみ
+      </label>
+      <select id="sort">
+        <option value="name">並び替え：名前</option>
+        <option value="company">並び替え：会社</option>
+        <option value="recent">並び替え：最近追加</option>
+      </select>
+    </div>
+  </nav>
+
+  <main>
+    <div id="count" class="count"></div>
+    <div id="grid" class="grid"></div>
+    <div id="empty" class="empty hidden">
+      <p>該当する名刺がありません。</p>
+    </div>
+  </main>
+
+  <!-- 詳細モーダル -->
+  <div id="detailModal" class="modal hidden">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card detail">
+      <button class="modal-close" data-close aria-label="閉じる">×</button>
+      <div id="detailBody"></div>
+      <div class="detail-actions">
+        <button id="detailEdit" class="btn">編集</button>
+        <button id="detailDelete" class="btn danger">削除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 編集／追加モーダル -->
+  <div id="formModal" class="modal hidden">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card">
+      <button class="modal-close" data-close aria-label="閉じる">×</button>
+      <h2 id="formTitle">名刺を追加</h2>
+      <form id="cardForm">
+        <div class="form-grid">
+          <label>氏名（日本語）<input name="nameJa" required /></label>
+          <label>Name (English)<input name="nameEn" /></label>
+          <label>会社名（日本語）<input name="companyJa" /></label>
+          <label>Company (English)<input name="companyEn" /></label>
+          <label>役職（日本語）<input name="titleJa" /></label>
+          <label>Title (English)<input name="titleEn" /></label>
+          <label>部署（日本語）<input name="departmentJa" /></label>
+          <label>Department (English)<input name="departmentEn" /></label>
+          <label class="full">資格・メンバーシップ<input name="qualifications" /></label>
+          <label>メール<input name="email" type="email" /></label>
+          <label>Webサイト<input name="website" /></label>
+          <label>電話<input name="phone" /></label>
+          <label>電話（その他）<input name="phoneSub" /></label>
+          <label>携帯<input name="mobile" /></label>
+          <label>FAX<input name="fax" /></label>
+          <label>郵便番号<input name="postalCode" /></label>
+          <label class="full">住所（日本語）<input name="addressJa" /></label>
+          <label class="full">Address (English)<input name="addressEn" /></label>
+          <label class="full">タグ（カンマ区切り）<input name="tags" placeholder="金融, 弁護士" /></label>
+          <label class="full">メモ<textarea name="notes" rows="2"></textarea></label>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn ghost" data-close>キャンセル</button>
+          <button type="submit" class="btn primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <input type="file" id="importFile" accept="application/json,.json" class="hidden" />
+
+  <script src="cards.seed.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
