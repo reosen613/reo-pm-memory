@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>名刺管理 — Meishi</title>
+  <!-- 単一ファイル版: このファイル1つで動きます。ブラウザで開くだけ。 -->
+  <style>
+:root {
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --ink: #1c2430;
+  --muted: #6b7686;
+  --line: #e3e6ec;
+  --brand: #2f6df0;
+  --brand-ink: #1b4fc0;
+  --danger: #d8443c;
+  --radius: 14px;
+  --shadow: 0 1px 3px rgba(20,30,50,.08), 0 8px 24px rgba(20,30,50,.06);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN",
+    "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Top bar ---- */
+.topbar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 16px;
+  padding: 12px 20px;
+  background: rgba(255,255,255,.85);
+  backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 8px; }
+.brand .logo { font-size: 22px; }
+.brand h1 { font-size: 18px; margin: 0; white-space: nowrap; }
+.search { flex: 1; }
+.search input {
+  width: 100%; max-width: 520px;
+  padding: 10px 14px; border: 1px solid var(--line);
+  border-radius: 10px; font-size: 14px; background: var(--surface);
+}
+.search input:focus { outline: 2px solid var(--brand); border-color: transparent; }
+.actions { display: flex; align-items: center; gap: 8px; position: relative; }
+
+/* ---- Buttons ---- */
+.btn {
+  border: 1px solid var(--line); background: var(--surface);
+  color: var(--ink); padding: 9px 14px; border-radius: 10px;
+  font-size: 14px; cursor: pointer; white-space: nowrap;
+}
+.btn:hover { border-color: #c7ccd6; }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+.btn.primary:hover { background: var(--brand-ink); }
+.btn.ghost { background: transparent; }
+.btn.danger { color: var(--danger); border-color: #f0c6c3; }
+.btn.danger:hover { background: #fff0ef; }
+
+.menu { position: relative; }
+.menu-panel {
+  position: absolute; right: 0; top: 44px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; box-shadow: var(--shadow);
+  display: flex; flex-direction: column; min-width: 240px; overflow: hidden;
+}
+.menu-panel button {
+  text-align: left; background: none; border: none; padding: 12px 16px;
+  font-size: 14px; cursor: pointer; color: var(--ink);
+}
+.menu-panel button:hover { background: #f3f5f9; }
+.menu-panel button.danger { color: var(--danger); }
+
+/* ---- Filters ---- */
+.filters {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 12px 20px; flex-wrap: wrap;
+}
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip {
+  border: 1px solid var(--line); background: var(--surface);
+  padding: 6px 12px; border-radius: 999px; font-size: 13px; cursor: pointer;
+  color: var(--muted);
+}
+.chip .n { color: #aab2bf; margin-left: 4px; font-variant-numeric: tabular-nums; }
+.chip.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+.chip.active .n { color: rgba(255,255,255,.8); }
+.toolbar { display: flex; align-items: center; gap: 14px; }
+.fav-toggle { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.toolbar select {
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px;
+  font-size: 13px; background: var(--surface); color: var(--ink);
+}
+
+/* ---- Grid ---- */
+main { padding: 8px 20px 60px; }
+.count { color: var(--muted); font-size: 13px; margin: 4px 2px 14px; }
+.grid {
+  display: grid; gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+.card {
+  position: relative; background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 16px; cursor: pointer;
+  box-shadow: var(--shadow); transition: transform .08s ease, box-shadow .15s ease;
+  display: flex; gap: 14px; align-items: flex-start;
+}
+.card:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(20,30,50,.1), 0 16px 32px rgba(20,30,50,.08); }
+.avatar {
+  flex: 0 0 auto; width: 46px; height: 46px; border-radius: 12px;
+  display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 18px;
+}
+.card-main { min-width: 0; flex: 1; }
+.card .name { font-size: 16px; font-weight: 700; }
+.card .name-en { font-size: 12px; color: var(--muted); margin-top: 1px; }
+.card .company { font-size: 13px; margin-top: 8px; color: var(--ink); }
+.card .title { font-size: 12px; color: var(--muted); margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card .tags { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+.tag { font-size: 11px; background: #eef1f6; color: #5a6573; border-radius: 6px; padding: 2px 7px; }
+.fav-star {
+  position: absolute; top: 12px; right: 12px; font-size: 16px;
+  background: none; border: none; cursor: pointer; color: #d8dce3; line-height: 1;
+}
+.fav-star.on { color: #f5a623; }
+
+.empty { text-align: center; color: var(--muted); padding: 60px 0; }
+
+/* ---- Modal ---- */
+.modal { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 20px; }
+.modal-backdrop { position: absolute; inset: 0; background: rgba(15,22,33,.45); }
+.modal-card {
+  position: relative; background: var(--surface); border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.3); width: min(640px, 100%);
+  max-height: 88vh; overflow: auto; padding: 24px;
+}
+.modal-close {
+  position: absolute; top: 12px; right: 14px; border: none; background: none;
+  font-size: 24px; color: var(--muted); cursor: pointer; line-height: 1;
+}
+.modal-card h2 { margin: 0 0 16px; font-size: 18px; }
+
+/* detail */
+.detail-head { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 8px; }
+.detail-head .avatar { width: 58px; height: 58px; font-size: 22px; border-radius: 14px; }
+.detail-head .name { font-size: 22px; font-weight: 700; }
+.detail-head .name-en { color: var(--muted); font-size: 14px; }
+.detail-head .company { margin-top: 6px; font-weight: 600; }
+.detail-head .company-en { color: var(--muted); font-size: 13px; }
+.detail-head .title { color: var(--muted); font-size: 14px; margin-top: 4px; }
+.detail dl { display: grid; grid-template-columns: 92px 1fr; gap: 8px 14px; margin: 18px 0 0; }
+.detail dt { color: var(--muted); font-size: 13px; }
+.detail dd { margin: 0; font-size: 14px; word-break: break-word; }
+.detail dd a { color: var(--brand); text-decoration: none; }
+.detail dd a:hover { text-decoration: underline; }
+.detail .qual { font-size: 13px; }
+.detail-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px;
+  border-top: 1px solid var(--line); padding-top: 16px; }
+.detail .pair { display: block; }
+.detail .pair .en { color: var(--muted); font-size: 12px; }
+
+/* form */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+.form-grid label { display: flex; flex-direction: column; font-size: 12px; color: var(--muted); gap: 5px; }
+.form-grid label.full { grid-column: 1 / -1; }
+.form-grid input, .form-grid textarea {
+  border: 1px solid var(--line); border-radius: 9px; padding: 9px 11px;
+  font-size: 14px; color: var(--ink); font-family: inherit; background: #fff;
+}
+.form-grid input:focus, .form-grid textarea:focus { outline: 2px solid var(--brand); border-color: transparent; }
+.form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+.hidden { display: none !important; }
+
+@media (max-width: 560px) {
+  .brand h1 { display: none; }
+  .form-grid { grid-template-columns: 1fr; }
+  .topbar { flex-wrap: wrap; }
+  .search { order: 3; flex-basis: 100%; }
+}
+
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🗂️</span>
+      <h1>名刺管理</h1>
+    </div>
+    <div class="search">
+      <input id="search" type="search" placeholder="名前・会社・役職・メールで検索…" autocomplete="off" />
+    </div>
+    <div class="actions">
+      <button id="addBtn" class="btn primary">＋ 名刺を追加</button>
+      <div class="menu">
+        <button id="menuBtn" class="btn ghost" aria-label="メニュー">⋯</button>
+        <div id="menuPanel" class="menu-panel hidden">
+          <button id="exportBtn">バックアップを書き出す（JSON）</button>
+          <button id="importBtn">バックアップを読み込む（JSON）</button>
+          <button id="resetBtn" class="danger">サンプルデータに戻す</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <nav class="filters">
+    <div id="companyChips" class="chips"></div>
+    <div class="toolbar">
+      <label class="fav-toggle">
+        <input type="checkbox" id="favOnly" /> お気に入りのみ
+      </label>
+      <select id="sort">
+        <option value="name">並び替え：名前</option>
+        <option value="company">並び替え：会社</option>
+        <option value="recent">並び替え：最近追加</option>
+      </select>
+    </div>
+  </nav>
+
+  <main>
+    <div id="count" class="count"></div>
+    <div id="grid" class="grid"></div>
+    <div id="empty" class="empty hidden">
+      <p>該当する名刺がありません。</p>
+    </div>
+  </main>
+
+  <!-- 詳細モーダル -->
+  <div id="detailModal" class="modal hidden">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card detail">
+      <button class="modal-close" data-close aria-label="閉じる">×</button>
+      <div id="detailBody"></div>
+      <div class="detail-actions">
+        <button id="detailEdit" class="btn">編集</button>
+        <button id="detailDelete" class="btn danger">削除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 編集／追加モーダル -->
+  <div id="formModal" class="modal hidden">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card">
+      <button class="modal-close" data-close aria-label="閉じる">×</button>
+      <h2 id="formTitle">名刺を追加</h2>
+      <form id="cardForm">
+        <div class="form-grid">
+          <label>氏名（日本語）<input name="nameJa" required /></label>
+          <label>Name (English)<input name="nameEn" /></label>
+          <label>会社名（日本語）<input name="companyJa" /></label>
+          <label>Company (English)<input name="companyEn" /></label>
+          <label>役職（日本語）<input name="titleJa" /></label>
+          <label>Title (English)<input name="titleEn" /></label>
+          <label>部署（日本語）<input name="departmentJa" /></label>
+          <label>Department (English)<input name="departmentEn" /></label>
+          <label class="full">資格・メンバーシップ<input name="qualifications" /></label>
+          <label>メール<input name="email" type="email" /></label>
+          <label>Webサイト<input name="website" /></label>
+          <label>電話<input name="phone" /></label>
+          <label>電話（その他）<input name="phoneSub" /></label>
+          <label>携帯<input name="mobile" /></label>
+          <label>FAX<input name="fax" /></label>
+          <label>郵便番号<input name="postalCode" /></label>
+          <label class="full">住所（日本語）<input name="addressJa" /></label>
+          <label class="full">Address (English)<input name="addressEn" /></label>
+          <label class="full">タグ（カンマ区切り）<input name="tags" placeholder="金融, 弁護士" /></label>
+          <label class="full">メモ<textarea name="notes" rows="2"></textarea></label>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn ghost" data-close>キャンセル</button>
+          <button type="submit" class="btn primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <input type="file" id="importFile" accept="application/json,.json" class="hidden" />
+
+  <script>
+// 初期サンプルデータ（受け取った名刺をデジタル化したもの）。
+// 日英が表裏セットの名刺は、JA / EN の両フィールドにまとめています。
+// このファイルは「サンプルに戻す」操作の元データとしても使われます。
+window.MEISHI_SEED = [
+  {
+    nameJa: "中山 達也", nameEn: "Tatsuya Nakayama",
+    companyJa: "西村あさひ法律事務所・外国法共同事業",
+    companyEn: "Nishimura & Asahi (Gaikokuho Kyodo Jigyo)",
+    titleJa: "パートナー", titleEn: "Partner",
+    departmentJa: "", departmentEn: "",
+    qualifications: "弁護士・ニューヨーク州弁護士 / Attorney-at-Law, Admitted in Japan & New York",
+    email: "ta.nakayama@nishimura.com",
+    phone: "03-6250-6347", phoneSub: "03-6250-6200（代表）", fax: "03-6250-7200", mobile: "",
+    postalCode: "100-8124",
+    addressJa: "東京都千代田区大手町1-1-2 大手門タワー",
+    addressEn: "Otemon Tower, 1-1-2 Otemachi, Chiyoda-ku, Tokyo 100-8124, Japan",
+    website: "https://www.nishimura.com/",
+    tags: ["法律", "弁護士"], notes: "", favorite: false
+  },
+  {
+    nameJa: "小林 咲花", nameEn: "Sakka Kobayashi",
+    companyJa: "西村あさひ法律事務所・外国法共同事業",
+    companyEn: "Nishimura & Asahi (Gaikokuho Kyodo Jigyo)",
+    titleJa: "パートナー", titleEn: "Partner",
+    departmentJa: "", departmentEn: "",
+    qualifications: "弁護士（日本、ニューヨーク州及びテキサス州） / Attorney-at-Law, Admitted in Japan, New York & Texas",
+    email: "s.kobayashi@nishimura.com",
+    phone: "03-6250-6605", phoneSub: "03-6250-6200（代表）", fax: "03-6250-7200", mobile: "",
+    postalCode: "100-8124",
+    addressJa: "東京都千代田区大手町1-1-2 大手門タワー",
+    addressEn: "Otemon Tower, 1-1-2 Otemachi, Chiyoda-ku, Tokyo 100-8124, Japan",
+    website: "https://www.nishimura.com/",
+    tags: ["法律", "弁護士"], notes: "", favorite: false
+  },
+  {
+    nameJa: "榊 遥佳", nameEn: "Haruka Sakaki",
+    companyJa: "西村あさひ法律事務所・外国法共同事業",
+    companyEn: "Nishimura & Asahi (Gaikokuho Kyodo Jigyo)",
+    titleJa: "弁護士", titleEn: "Attorney-at-Law",
+    departmentJa: "", departmentEn: "",
+    qualifications: "",
+    email: "h.sakaki@nishimura.com",
+    phone: "03-6250-7561（直通）", phoneSub: "", fax: "", mobile: "",
+    postalCode: "100-8124",
+    addressJa: "東京都千代田区大手町1-1-2 大手門タワー",
+    addressEn: "Otemon Tower, 1-1-2 Otemachi, Chiyoda-ku, Tokyo 100-8124, Japan",
+    website: "https://www.nishimura.com/",
+    tags: ["法律", "弁護士"], notes: "", favorite: false
+  },
+  {
+    nameJa: "佐々木 享子", nameEn: "Kyoko Sasaki",
+    companyJa: "住友生命保険相互会社",
+    companyEn: "Sumitomo Life Insurance Company",
+    titleJa: "エグゼクティブコンサルタント", titleEn: "",
+    departmentJa: "東京本社すみれい事業部 FP営業課", departmentEn: "",
+    qualifications: "2級ファイナンシャル・プランニング技能士 / 2025年度MDRT成績資格終身会員 / Court of the Table 会員",
+    email: "sasaki-kyouko@sumisei.jp",
+    phone: "03-3588-0601", phoneSub: "03-3588-0602", fax: "03-3588-0726", mobile: "",
+    postalCode: "",
+    addressJa: "東京都港区赤坂3-3-3 住友生命赤坂ビル3F",
+    addressEn: "",
+    website: "",
+    tags: ["保険", "FP"], notes: "日本語名刺のみ受領。", favorite: false
+  },
+  {
+    nameJa: "植木 浩", nameEn: "Ueki Hiroshi",
+    companyJa: "T&Dフィナンシャル生命保険株式会社",
+    companyEn: "T&D Financial Life Insurance Company",
+    titleJa: "リスク管理部長", titleEn: "Senior Manager",
+    departmentJa: "保険計理人", departmentEn: "Risk Management Division",
+    qualifications: "FIAJ / 日本アクチュアリー会正会員 / 公認内部監査人（CIA） / 公認情報システム監査人（CISA）",
+    email: "ueki.hiroshi@tdf-life.co.jp",
+    phone: "050-1730-9403", phoneSub: "", fax: "", mobile: "",
+    postalCode: "105-0023",
+    addressJa: "東京都港区芝浦1-1-1",
+    addressEn: "1-1-1, Shibaura, Minato-ku, Tokyo, 105-0023, Japan",
+    website: "https://www.tdf-life.co.jp/",
+    tags: ["保険", "T&D"], notes: "", favorite: false
+  },
+  {
+    nameJa: "杉本 和大", nameEn: "Sugimoto Kazuhiro",
+    companyJa: "T&Dフィナンシャル生命保険株式会社",
+    companyEn: "T&D Financial Life Insurance Company",
+    titleJa: "経営管理部長", titleEn: "General Manager",
+    departmentJa: "", departmentEn: "Finance & Accounting Department",
+    qualifications: "F.I.A.J. / 日本アクチュアリー会正会員",
+    email: "sugimoto.kazuhiro@tdf-life.co.jp",
+    phone: "03-6745-6812", phoneSub: "", fax: "", mobile: "050-1730-9414（直通）",
+    postalCode: "105-0023",
+    addressJa: "東京都港区芝浦1-1-1",
+    addressEn: "1-1-1, Shibaura, Minato-ku, Tokyo 105-0023, Japan",
+    website: "https://www.tdf-life.co.jp/",
+    tags: ["保険", "T&D"], notes: "", favorite: false
+  },
+  {
+    nameJa: "貴田 岳史", nameEn: "Takeshi Kida",
+    companyJa: "T&Dフィナンシャル生命保険株式会社",
+    companyEn: "T&D Financial Life Insurance Company",
+    titleJa: "企画部長", titleEn: "",
+    departmentJa: "", departmentEn: "",
+    qualifications: "",
+    email: "kida.takeshi.30@tdf-life.co.jp",
+    phone: "03-6745-6808", phoneSub: "", fax: "", mobile: "",
+    postalCode: "105-0023",
+    addressJa: "東京都港区芝浦1丁目1番1号",
+    addressEn: "",
+    website: "https://www.tdf-life.co.jp/",
+    tags: ["保険", "T&D"], notes: "日本語名刺のみ受領。", favorite: false
+  },
+  {
+    nameJa: "木下 正治", nameEn: "Masaharu Kinoshita",
+    companyJa: "T&Dユナイテッドキャピタル株式会社",
+    companyEn: "T&D United Capital Co., Ltd",
+    titleJa: "取締役執行役員 事業開発部長", titleEn: "Board Director and Executive Officer",
+    departmentJa: "", departmentEn: "Managing Director and Head of Business Development",
+    qualifications: "CMA",
+    email: "masaharu.kinoshita@tduc.co.jp",
+    phone: "03-3272-6864", phoneSub: "masaharu.kinoshita@td-holdings.co.jp（メール）", fax: "", mobile: "050-3628-7117",
+    postalCode: "103-6031",
+    addressJa: "東京都中央区日本橋2丁目7番1号",
+    addressEn: "7-1, Nohonbashi 2-chome, Chuo-ku, Tokyo 103-6031, Japan",
+    website: "",
+    tags: ["金融", "T&D"], notes: "", favorite: false
+  },
+  {
+    nameJa: "松本 匡史", nameEn: "Tadashi Matsumoto",
+    companyJa: "農林中央金庫",
+    companyEn: "The Norinchukin Bank",
+    titleJa: "資金為替部 副部長 企画グループ長", titleEn: "Global Co-Head of Treasury & Forex Division",
+    departmentJa: "資金為替部", departmentEn: "Treasury & Forex Division",
+    qualifications: "",
+    email: "tadashi_matsumoto@nochubank.or.jp",
+    phone: "050-3123-5551", phoneSub: "", fax: "", mobile: "",
+    postalCode: "100-8155",
+    addressJa: "東京都千代田区大手町1-2-1 Otemachi One タワー",
+    addressEn: "1-2-1, Otemachi, Chiyoda-ku, Tokyo, 100-8155, Japan",
+    website: "https://www.nochubank.or.jp/",
+    tags: ["金融", "農林中金"], notes: "", favorite: false
+  },
+  {
+    nameJa: "間島 奈美", nameEn: "Nami Majima",
+    companyJa: "農林中央金庫",
+    companyEn: "The Norinchukin Bank",
+    titleJa: "資金為替部 資金為替班 部長代理", titleEn: "Senior Manager, Money Markets & Forex",
+    departmentJa: "グローバル・インベストメンツ本部", departmentEn: "Treasury & Forex Division, Global Investments",
+    qualifications: "",
+    email: "n-majima@nochubank.or.jp",
+    phone: "03-6362-7106", phoneSub: "", fax: "", mobile: "",
+    postalCode: "100-8155",
+    addressJa: "東京都千代田区大手町一丁目2番1号 Otemachi One タワー",
+    addressEn: "2-1, Otemachi 1-chome, Chiyoda-ku, Tokyo 100-8155, Japan",
+    website: "https://www.nochubank.or.jp/",
+    tags: ["金融", "農林中金"], notes: "", favorite: false
+  },
+  {
+    nameJa: "橋本 哲也", nameEn: "Tetsuya Hashimoto",
+    companyJa: "農林中央金庫",
+    companyEn: "The Norinchukin Bank",
+    titleJa: "財務企画部 部長", titleEn: "General Manager",
+    departmentJa: "財務企画部", departmentEn: "Financial Planning and Control Division",
+    qualifications: "",
+    email: "t-hashimoto@nochubank.or.jp",
+    phone: "050-3123-5622", phoneSub: "", fax: "", mobile: "",
+    postalCode: "100-8155",
+    addressJa: "東京都千代田区大手町1-2-1 Otemachi One タワー",
+    addressEn: "1-2-1, Otemachi, Chiyoda-ku, Tokyo, 100-8155, Japan",
+    website: "https://www.nochubank.or.jp/",
+    tags: ["金融", "農林中金"], notes: "", favorite: false
+  },
+  {
+    nameJa: "鶴賀 重樹", nameEn: "Shigeki Tsuruga",
+    companyJa: "農林中央金庫",
+    companyEn: "The Norinchukin Bank",
+    titleJa: "資金為替部 副部長 企画グループ長", titleEn: "Global Head of Treasury & Forex Division",
+    departmentJa: "資金為替部", departmentEn: "Treasury & Forex Division",
+    qualifications: "",
+    email: "stsuruga@nochubank.or.jp",
+    phone: "050-3853-0271", phoneSub: "", fax: "", mobile: "",
+    postalCode: "100-8155",
+    addressJa: "東京都千代田区大手町一丁目2番1号 Otemachi One タワー",
+    addressEn: "2-1, Otemachi 1-chome, Chiyoda-ku, Tokyo 100-8155, Japan",
+    website: "https://www.nochubank.or.jp/",
+    tags: ["金融", "農林中金"], notes: "", favorite: false
+  },
+  {
+    nameJa: "阿久津 怜生", nameEn: "Reo Akutsu",
+    companyJa: "JPモルガン証券株式会社",
+    companyEn: "JPMorgan Securities Japan Co., Ltd.",
+    titleJa: "金融法人グループ", titleEn: "Financial Institutions Group",
+    departmentJa: "投資銀行本部 投資銀行部", departmentEn: "Investment Banking, Investment Banking Division",
+    qualifications: "",
+    email: "reo.akutsu@jpmorgan.com",
+    phone: "03-6736-1204", phoneSub: "", fax: "", mobile: "",
+    postalCode: "100-6432",
+    addressJa: "東京都千代田区丸の内2丁目7番3号 東京ビルディング",
+    addressEn: "Tokyo Building, 7-3, Marunouchi 2-chome, Chiyoda-ku, Tokyo 100-6432",
+    website: "https://www.jpmorgan.com/",
+    tags: ["金融", "投資銀行"], notes: "", favorite: false
+  },
+  {
+    nameJa: "平賀 義啓", nameEn: "Yoshihiro Hiraga",
+    companyJa: "日本郵政株式会社",
+    companyEn: "Japan Post Holdings Co., Ltd.",
+    titleJa: "経営企画部 次長", titleEn: "",
+    departmentJa: "経営企画部", departmentEn: "",
+    qualifications: "",
+    email: "yoshihiro.hiraga.xr@jp-holdings.jp",
+    phone: "03-3477-0213", phoneSub: "03-3477-0222（直通・内線312855）", fax: "", mobile: "",
+    postalCode: "100-8791",
+    addressJa: "東京都千代田区大手町二丁目3番1号",
+    addressEn: "",
+    website: "https://www.japanpost.jp/",
+    tags: ["官公庁系", "郵政"], notes: "日本語名刺のみ受領。", favorite: false
+  }
+];
+
+</script>
+  <script>
+/* 名刺管理 — 依存ゼロのローカルアプリ。
+ * データは localStorage に保存。初回起動時に cards.seed.js から取り込みます。 */
+(() => {
+  "use strict";
+
+  const STORAGE_KEY = "meishi.cards.v1";
+  const AVATAR_COLORS = ["#2f6df0", "#10a37f", "#e0584b", "#7b61ff", "#f5a623",
+    "#0a9bb5", "#d6438f", "#5a6573", "#3a7d3a", "#c2772a"];
+
+  // ---- state ----
+  let cards = [];
+  let activeCompany = "all";
+  let query = "";
+  let favOnly = false;
+  let sortBy = "name";
+
+  // ---- persistence ----
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+  function normalize(c) {
+    return Object.assign({
+      id: uid(), nameJa: "", nameEn: "", companyJa: "", companyEn: "",
+      titleJa: "", titleEn: "", departmentJa: "", departmentEn: "",
+      qualifications: "", email: "", website: "", phone: "", phoneSub: "",
+      mobile: "", fax: "", postalCode: "", addressJa: "", addressEn: "",
+      tags: [], notes: "", favorite: false, createdAt: Date.now()
+    }, c);
+  }
+
+  function load() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      try { cards = JSON.parse(raw).map(normalize); return; } catch (e) { /* fall through */ }
+    }
+    seed();
+  }
+
+  function seed() {
+    const src = window.MEISHI_SEED || [];
+    cards = src.map((c, i) => normalize(Object.assign({ createdAt: Date.now() + i }, c)));
+    save();
+  }
+
+  function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(cards)); }
+
+  // ---- helpers ----
+  const $ = (sel) => document.querySelector(sel);
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g,
+    (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+
+  function initials(c) {
+    const n = (c.nameJa || c.nameEn || "?").trim();
+    // 日本語: 姓の1文字目。英語: 各単語の頭文字。
+    if (/[　-鿿＀-￯]/.test(n)) return n.replace(/\s/g, "").slice(0, 1);
+    return n.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+  }
+
+  function colorFor(c) {
+    const key = c.companyJa || c.companyEn || c.nameJa || "";
+    let h = 0;
+    for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+    return AVATAR_COLORS[h % AVATAR_COLORS.length];
+  }
+
+  function companyLabel(c) { return c.companyJa || c.companyEn || "（会社未設定）"; }
+
+  function searchBlob(c) {
+    return [c.nameJa, c.nameEn, c.companyJa, c.companyEn, c.titleJa, c.titleEn,
+      c.departmentJa, c.departmentEn, c.email, c.qualifications, c.notes,
+      (c.tags || []).join(" ")].join(" ").toLowerCase();
+  }
+
+  // ---- rendering ----
+  function visibleCards() {
+    let list = cards.slice();
+    if (activeCompany !== "all") list = list.filter((c) => companyLabel(c) === activeCompany);
+    if (favOnly) list = list.filter((c) => c.favorite);
+    if (query) {
+      const q = query.toLowerCase();
+      list = list.filter((c) => searchBlob(c).includes(q));
+    }
+    const coll = new Intl.Collator("ja");
+    list.sort((a, b) => {
+      if (sortBy === "recent") return b.createdAt - a.createdAt;
+      if (sortBy === "company") {
+        const c = coll.compare(companyLabel(a), companyLabel(b));
+        if (c !== 0) return c;
+      }
+      return coll.compare(a.nameJa || a.nameEn, b.nameJa || b.nameEn);
+    });
+    return list;
+  }
+
+  function renderChips() {
+    const counts = new Map();
+    cards.forEach((c) => {
+      const k = companyLabel(c);
+      counts.set(k, (counts.get(k) || 0) + 1);
+    });
+    const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ja"));
+    const chips = [`<button class="chip ${activeCompany === "all" ? "active" : ""}" data-company="all">すべて<span class="n">${cards.length}</span></button>`];
+    sorted.forEach(([name, n]) => {
+      chips.push(`<button class="chip ${activeCompany === name ? "active" : ""}" data-company="${esc(name)}">${esc(name)}<span class="n">${n}</span></button>`);
+    });
+    $("#companyChips").innerHTML = chips.join("");
+  }
+
+  function cardHTML(c) {
+    const tags = (c.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join("");
+    return `<article class="card" data-id="${c.id}">
+      <button class="fav-star ${c.favorite ? "on" : ""}" data-fav="${c.id}" title="お気に入り">${c.favorite ? "★" : "☆"}</button>
+      <div class="avatar" style="background:${colorFor(c)}">${esc(initials(c))}</div>
+      <div class="card-main">
+        <div class="name">${esc(c.nameJa || c.nameEn)}</div>
+        ${c.nameEn && c.nameJa ? `<div class="name-en">${esc(c.nameEn)}</div>` : ""}
+        <div class="company">${esc(companyLabel(c))}</div>
+        <div class="title">${esc(c.titleJa || c.titleEn || "")}</div>
+        ${tags ? `<div class="tags">${tags}</div>` : ""}
+      </div>
+    </article>`;
+  }
+
+  function render() {
+    renderChips();
+    const list = visibleCards();
+    $("#grid").innerHTML = list.map(cardHTML).join("");
+    $("#count").textContent = `${list.length} 件${activeCompany !== "all" ? `（${activeCompany}）` : ""}`;
+    $("#empty").classList.toggle("hidden", list.length > 0);
+  }
+
+  // ---- detail ----
+  let currentId = null;
+
+  function pair(ja, en) {
+    if (!ja && !en) return "";
+    return `<span class="pair">${esc(ja || en)}${ja && en ? `<span class="en">${esc(en)}</span>` : ""}</span>`;
+  }
+
+  function row(label, value) {
+    return value ? `<dt>${label}</dt><dd>${value}</dd>` : "";
+  }
+
+  function openDetail(id) {
+    const c = cards.find((x) => x.id === id);
+    if (!c) return;
+    currentId = id;
+    const tel = (v) => v ? `<a href="tel:${esc(String(v).replace(/[^0-9+]/g, ""))}">${esc(v)}</a>` : "";
+    const phones = [c.phone, c.phoneSub, c.mobile && `携帯: ${c.mobile}`, c.fax && `FAX: ${c.fax}`]
+      .filter(Boolean).map((p) => tel(p)).join("<br>");
+    const addr = pair(
+      (c.postalCode ? "〒" + c.postalCode + " " : "") + (c.addressJa || ""),
+      c.addressEn
+    );
+    $("#detailBody").innerHTML = `
+      <div class="detail-head">
+        <div class="avatar" style="background:${colorFor(c)}">${esc(initials(c))}</div>
+        <div>
+          <div class="name">${esc(c.nameJa || c.nameEn)}</div>
+          ${c.nameEn && c.nameJa ? `<div class="name-en">${esc(c.nameEn)}</div>` : ""}
+          <div class="company">${esc(c.companyJa || c.companyEn)}</div>
+          ${c.companyEn && c.companyJa ? `<div class="company-en">${esc(c.companyEn)}</div>` : ""}
+          <div class="title">${esc([c.departmentJa, c.titleJa].filter(Boolean).join(" / "))}</div>
+          ${(c.titleEn || c.departmentEn) ? `<div class="title">${esc([c.departmentEn, c.titleEn].filter(Boolean).join(" / "))}</div>` : ""}
+        </div>
+      </div>
+      <dl>
+        ${row("資格", c.qualifications ? `<span class="qual">${esc(c.qualifications)}</span>` : "")}
+        ${row("メール", c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : "")}
+        ${row("電話", phones)}
+        ${row("住所", addr)}
+        ${row("Web", c.website ? `<a href="${esc(c.website)}" target="_blank" rel="noopener">${esc(c.website)}</a>` : "")}
+        ${row("タグ", (c.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join(" "))}
+        ${row("メモ", c.notes ? esc(c.notes).replace(/\n/g, "<br>") : "")}
+      </dl>`;
+    show("#detailModal");
+  }
+
+  // ---- form ----
+  let editingId = null;
+
+  function openForm(id) {
+    editingId = id || null;
+    const form = $("#cardForm");
+    form.reset();
+    $("#formTitle").textContent = id ? "名刺を編集" : "名刺を追加";
+    if (id) {
+      const c = cards.find((x) => x.id === id);
+      Object.keys(c).forEach((k) => {
+        if (form.elements[k]) {
+          form.elements[k].value = k === "tags" ? (c.tags || []).join(", ") : (c[k] || "");
+        }
+      });
+    }
+    show("#formModal");
+    setTimeout(() => form.elements["nameJa"].focus(), 50);
+  }
+
+  function submitForm(e) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const data = Object.fromEntries(fd.entries());
+    data.tags = (data.tags || "").split(",").map((s) => s.trim()).filter(Boolean);
+    if (editingId) {
+      const c = cards.find((x) => x.id === editingId);
+      Object.assign(c, data);
+    } else {
+      cards.push(normalize(Object.assign({ createdAt: Date.now() }, data)));
+    }
+    save();
+    render();
+    hide("#formModal");
+  }
+
+  // ---- modals ----
+  function show(sel) { $(sel).classList.remove("hidden"); }
+  function hide(sel) { $(sel).classList.add("hidden"); }
+
+  // ---- import / export ----
+  function exportJSON() {
+    const blob = new Blob([JSON.stringify(cards, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `meishi-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function importJSON(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if (!Array.isArray(data)) throw new Error("配列ではありません");
+        if (!confirm(`${data.length} 件を読み込みます。現在のデータは置き換えられます。よろしいですか？`)) return;
+        cards = data.map(normalize);
+        save();
+        activeCompany = "all";
+        render();
+      } catch (err) {
+        alert("読み込みに失敗しました: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // ---- events ----
+  function bind() {
+    $("#search").addEventListener("input", (e) => { query = e.target.value.trim(); render(); });
+    $("#favOnly").addEventListener("change", (e) => { favOnly = e.target.checked; render(); });
+    $("#sort").addEventListener("change", (e) => { sortBy = e.target.value; render(); });
+    $("#addBtn").addEventListener("click", () => openForm(null));
+
+    $("#companyChips").addEventListener("click", (e) => {
+      const chip = e.target.closest(".chip");
+      if (!chip) return;
+      activeCompany = chip.dataset.company;
+      render();
+    });
+
+    $("#grid").addEventListener("click", (e) => {
+      const fav = e.target.closest("[data-fav]");
+      if (fav) {
+        const c = cards.find((x) => x.id === fav.dataset.fav);
+        c.favorite = !c.favorite; save(); render();
+        return;
+      }
+      const card = e.target.closest(".card");
+      if (card) openDetail(card.dataset.id);
+    });
+
+    // menu
+    $("#menuBtn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      $("#menuPanel").classList.toggle("hidden");
+    });
+    document.addEventListener("click", () => $("#menuPanel").classList.add("hidden"));
+    $("#menuPanel").addEventListener("click", (e) => e.stopPropagation());
+    $("#exportBtn").addEventListener("click", () => { exportJSON(); $("#menuPanel").classList.add("hidden"); });
+    $("#importBtn").addEventListener("click", () => $("#importFile").click());
+    $("#importFile").addEventListener("change", (e) => { if (e.target.files[0]) importJSON(e.target.files[0]); e.target.value = ""; });
+    $("#resetBtn").addEventListener("click", () => {
+      if (confirm("サンプルデータに戻します。現在の変更は失われます。よろしいですか？")) {
+        seed(); activeCompany = "all"; render();
+      }
+    });
+
+    // detail actions
+    $("#detailEdit").addEventListener("click", () => { hide("#detailModal"); openForm(currentId); });
+    $("#detailDelete").addEventListener("click", () => {
+      const c = cards.find((x) => x.id === currentId);
+      if (c && confirm(`「${c.nameJa || c.nameEn}」を削除しますか？`)) {
+        cards = cards.filter((x) => x.id !== currentId);
+        save(); render(); hide("#detailModal");
+      }
+    });
+
+    // form
+    $("#cardForm").addEventListener("submit", submitForm);
+
+    // close handlers
+    document.querySelectorAll("[data-close]").forEach((el) =>
+      el.addEventListener("click", () => { hide("#detailModal"); hide("#formModal"); }));
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { hide("#detailModal"); hide("#formModal"); }
+    });
+  }
+
+  // ---- init ----
+  load();
+  bind();
+  render();
+})();
+
+</script>
+</body>
+</html>
