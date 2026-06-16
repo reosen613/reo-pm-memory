@@ -8,7 +8,13 @@ type: project
 
 - **❌ 不合格・選考終了**
 - モデリング手順書・ピッチ資料・面接振り返りは他社選考で再利用する。
-- 転職活動の主戦場はエンゲージメント型ファンド（Camphora / Kaname）へ移行。詳細は `project_job_search.md`。
+- 転職活動の主戦場はエンゲージメント型ファンド（Kaname Capital / Oasis 等）へ移行。詳細は `project_job_search.md`。
+
+## 資料フォルダ（ローカル）
+
+- **`C:\Users\reoak\OneDrive\デスクトップ\Reo Akutsu\14_Point72\`** — Point72 選考一式（モデルテスト／ストックピッチ関連）の保管フォルダ。
+- ストックピッチの個別資料は `08_Modeling\<ticker_name>\` 側にもある（`project_point72_stock_pitch.md` 参照）。
+- ※ このフォルダ群は不合格後も他社（Kaname / Oasis / Pantheum 等）のピッチ・モデル素材として再利用する。
 
 ## 経緯（アーカイブ）
 
@@ -22,14 +28,6 @@ type: project
 - Cohen面接の殺し問5問（Sell-side非認知/Catalyst日付/Primary data/定量化/逆反論）に無防備なまま進んだ。
 - → エンゲージメント型ファンド面接では「なぜ今か」に即答できる準備を先行させる。
 
-## アクティブなワークストリーム
-
-1. **ストックピッチ強化** ← メインフォーカス
-   - 詳細は `project_point72_stock_pitch.md` 参照
-   - 4ペアトレード資料は既に作成済、これから論点を本気で詰めていく
-2. **面談準備** — 想定問答、自己紹介、志望動機
-   - ピッチが固まってから着手
-
-**Why:** モデルテストは通過ゲートだったが、面談以降の評価はピッチとファンダメンタル分析力で決まる。ユーザーは「本気でストックピッチ極めたい」と明言。
-
-**How to apply:** Point72関連の会話では「モデルテストどう？」ではなく「ピッチどう詰める？」が現在の関心事。モデルテスト関連の質問が来たら過去事項として扱い、`reference_point72_model_test_playbook.md` を参照。
+**How to apply:** Point72 は終了案件。関連の質問は過去事項として扱い、モデルテストは
+`reference_point72_model_test_playbook.md`、ピッチ資料は `14_Point72` / `08_Modeling`
+フォルダと `project_point72_stock_pitch.md` を参照。学びは他社選考に転用する。

@@ -12,9 +12,11 @@ Point72面接プロセス：モデルテスト合格済（2026-04時点）、次
 3. TOWA(6315)L / Sansan(4443)S — 半導体物理独占 vs AI陳腐化 / +56%
 4. SMS(2175)L / リクルート(6098)S — 肉体労働希少性 vs AIマッチング破壊 / +55%
 
-**資料の場所:** `C:\Users\reoak\OneDrive\デスクトップ\Reo Akutsu\08_Modeling\<ticker_name>\`
-- 各銘柄に `XXXX_StockPitch_JP.docx` / `_EN.docx` + DCF EN/JP
-- ペアファイル: `<longticker>L_<shortticker>S_HF_Pitch_EN.docx`
+**資料の場所:**
+- ストックピッチ/DCF: `C:\Users\reoak\OneDrive\デスクトップ\Reo Akutsu\08_Modeling\<ticker_name>\`
+  - 各銘柄に `XXXX_StockPitch_JP.docx` / `_EN.docx` + DCF EN/JP
+  - ペアファイル: `<longticker>L_<shortticker>S_HF_Pitch_EN.docx`
+- Point72選考一式: `C:\Users\reoak\OneDrive\デスクトップ\Reo Akutsu\14_Point72\`（モデルテスト・選考資料の保管フォルダ）
 
 **Why:** 元会話 session `4036337c-bc0f-4f85-b222-3e86b00b8b9e`（2026-04-04開始）で全12書類のサマリと論点を分析済。ユーザーは「本気でストックピッチ極めたい」と明言。
 
