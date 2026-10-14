@@ -1,0 +1,25 @@
+name: Daily Stock Picks
+
+on:
+  schedule:
+    # 7:30 JST = 22:30 UTC prev day. Mon-Fri JST = Sun-Thu UTC
+    - cron: '30 22 * * 0-4'
+    # Also 15:30 JST = 06:30 UTC same day (post-market summary of day's disclosures)
+    - cron: '30 6 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Send daily stock picks
+        env:
+          LINE_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
+          LINE_USER: ${{ secrets.LINE_USER_ID }}
+        run: python scripts/daily_stock_picks.py
