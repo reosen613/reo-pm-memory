@@ -1,0 +1,36 @@
+name: LINE Reminders
+
+on:
+  schedule:
+    # All times in UTC = JST - 9h.
+    - cron: '0 13 14 10 *'  # 10/14 22:00 JST  UK ETA
+    - cron: '0 14 14 10 *'  # 10/14 23:00 JST  e転居
+    - cron: '0 22 14 10 *'  # 10/15 07:00 JST  引越し見積り
+    - cron: '0 23 14 10 *'  # 10/15 08:00 JST  佐野COO
+    - cron: '0 6 15 10 *'   # 10/15 15:00 JST  出発前
+    - cron: '0 1 21 10 *'   # 10/21 10:00 JST  HR返信check
+    - cron: '0 0 26 10 *'   # 10/26 09:00 JST  帰国日
+    - cron: '0 22 27 10 *'  # 10/28 07:00 JST  搬出
+    - cron: '0 22 29 10 *'  # 10/30 07:00 JST  CHP立会
+    - cron: '0 22 30 10 *'  # 10/31 07:00 JST  JPM退職
+    - cron: '0 22 31 10 *'  # 11/01 07:00 JST  Camphora入社
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install pyyaml
+
+      - name: Send reminder
+        env:
+          LINE_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
+          LINE_USER: ${{ secrets.LINE_USER_ID }}
+        run: python scripts/send_reminder.py
