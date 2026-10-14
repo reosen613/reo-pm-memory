@@ -29,12 +29,14 @@ KEYWORD_WEIGHTS = {
     # Earnings catalyst
     '上方修正': 9, '下方修正': 8, '業績予想': 6, '最高益': 7,
     '増益': 5, '通期予想': 4, '営業利益': 3,
+    'Earnings': 4, 'Upward Revision': 8, 'Downward Revision': 8,
     # Capital allocation
     '自社株買い': 7, '自己株式': 6, '増配': 6, '記念配当': 5,
     '株主還元': 6, '配当予想': 5,
+    'Share Buyback': 7, 'Dividend': 4, 'Treasury Stock': 5,
     # 増資 / Capital raise
     '第三者割当': 7, '新株予約権': 5, '増資': 5, '転換社債': 4,
-    'Issue Price': 4, 'Capital Investment': 3,
+    'Issue Price': 5, 'Selling Price': 5, 'Capital Investment': 4,
     # Governance / 不正 (short candidates)
     '不正': 9, '疑義': 9, '意見不表明': 9, '限定付適正意見': 8,
     '不適切': 8, '特別調査委員会': 8, '過年度訂正': 7,
@@ -114,6 +116,67 @@ def score_disclosure(d):
     return score
 
 
+def categorize(title):
+    """Return a short category tag + emoji + one-liner interpretation."""
+    t = title
+    # Event-driven (TOB/M&A)
+    if any(k in t for k in ['TOB', '公開買付', '非公開化', 'MBO', 'LBO', 'Tender']):
+        if '条件等の変更' in t or '価格の変更' in t or 'Amendment' in t:
+            return ('🤝 TOB変更', '買収価格・期限等の条件が変わった → arb対象')
+        return ('🤝 TOB/買収', '公開買付・M&A発表 → event-driven核心')
+    if '完全子会社化' in t or '株式交換' in t:
+        return ('🤝 子会社化', '同業・親子上場解消 → +50%プレミアム法則対象')
+    if '合併' in t:
+        return ('🤝 合併', 'シナジー + 支配権変更')
+    # Activist
+    if '大量保有' in t or '活動方針' in t or '重要提案' in t:
+        if '5%' in t or '新規' in t:
+            return ('⚔️ Activist新規', '5%超の新規保有 → Day 0 候補')
+        return ('⚔️ Activist', '保有変動・活動方針表明')
+    # Earnings
+    if '上方修正' in t or '最高益' in t:
+        return ('📈 業績上振れ', '業績予想の上方修正 → long候補')
+    if '下方修正' in t:
+        return ('📉 業績下振れ', '業績予想の下方修正 → short候補')
+    if '業績予想' in t:
+        return ('📊 業績予想', '通期・四半期の業績予想修正')
+    # Capital allocation
+    if '自社株買い' in t or '自己株式' in t:
+        return ('💰 自社株買い', '株主還元 → short-term支援')
+    if '増配' in t or '記念配当' in t:
+        return ('💰 増配', '配当方針強化')
+    # Governance red
+    if '意見不表明' in t or '限定付適正意見' in t:
+        return ('🚨 監査問題', 'Big4意見不表明 → 特別注意銘柄行き')
+    if '不正' in t or '不適切' in t or '疑義' in t:
+        return ('🚨 不正疑義', '会計不正・疑義表明 → short候補')
+    if '特別調査委員会' in t or '過年度訂正' in t:
+        return ('🚨 第三者委', '不正調査・過年度訂正')
+    if '特別注意' in t or '監理銘柄' in t or '上場廃止' in t:
+        return ('🚨 制裁', 'JPX特別注意・監理・上場廃止')
+    # Capital raise
+    if '第三者割当' in t or '新株予約権' in t:
+        return ('💵 増資', '第三者割当・新株予約権 → 希薄化')
+    # Partnership
+    if '資本業務提携' in t or '資本提携' in t:
+        return ('🤝 資本提携', '出資・業務提携')
+    # English fallbacks
+    if 'Issue Price' in t or 'Selling Price' in t:
+        return ('💵 公募価格決定', '公募・売出価格の決定 → IPOか増資')
+    if 'Capital Investment' in t or '設備投資' in t:
+        return ('🏭 設備投資', '追加設備投資・増産発表')
+    if 'Share Buyback' in t or 'Buyback' in t:
+        return ('💰 自社株買い (EN)', '英語開示の自社株買い')
+    if 'Dividend' in t:
+        return ('💰 配当関連 (EN)', '英語開示の配当関連')
+    if 'Acquisition' in t:
+        return ('🤝 Acquisition (EN)', '英語開示のM&A')
+    if 'Earnings' in t or 'Financial Results' in t:
+        return ('📊 決算 (EN)', '英語開示の決算関連')
+    # Default
+    return ('📄 開示', '')
+
+
 def send_line(token, user_id, message):
     req = urllib.request.Request(
         'https://api.line.me/v2/bot/message/push',
@@ -167,24 +230,36 @@ def main():
         print('No disclosures at all')
         return
 
-    lines = [f'📊 本日 ({date_str}) の 開示注目3銘柄', '']
-    for i, d in enumerate(top3, 1):
+    nums = ['1️⃣', '2️⃣', '3️⃣']
+    lines = [
+        '━━━━━━━━━━━━━━',
+        f'📊 {date_str} 開示注目3銘柄',
+        '━━━━━━━━━━━━━━',
+        '',
+    ]
+    for i, d in enumerate(top3):
         name = d['name'] or '(名称不明)'
         tag = f'[{d["exchange"]}]' if d['exchange'] else ''
-        title = d['title'][:70] + ('…' if len(d['title']) > 70 else '')
+        title = d['title'][:85] + ('…' if len(d['title']) > 85 else '')
         time_h = d['time'][11:16] if len(d['time']) >= 16 else ''
-        star = '⭐' if d['score'] >= 7 else ''
-        lines.append(f'{i}. {star}{d["code"]} {name} {tag}')
-        lines.append(f'   {title}')
+        cat, interp = categorize(d['title'])
+        star = '⭐ ' if d['score'] >= 15 else ''
+
+        lines.append(f'{nums[i]} {star}{d["code"]} {name} {tag}')
+        lines.append(f'   {cat}')
+        if interp:
+            lines.append(f'   → {interp}')
+        lines.append(f'   📰 {title}')
         meta = []
         if time_h:
-            meta.append(time_h)
+            meta.append(f'🕐 {time_h}')
         if d['score'] > 0:
-            meta.append(f'score={d["score"]}')
+            meta.append(f'📊 score {d["score"]}')
         if meta:
-            lines.append(f'   ({" | ".join(meta)})')
+            lines.append(f'   {" | ".join(meta)}')
         lines.append('')
-    lines.append(f'全開示 (全{len(disclosures)}件): https://kabutan.jp/disclosures/')
+    lines.append('━━━━━━━━━━━━━━')
+    lines.append(f'全{len(disclosures)}件: kabutan.jp/disclosures/')
     msg = '\n'.join(lines)
 
     status = send_line(token, user_id, msg)
