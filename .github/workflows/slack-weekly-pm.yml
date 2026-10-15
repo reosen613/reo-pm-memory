@@ -1,0 +1,23 @@
+name: Slack Weekly PM
+
+on:
+  schedule:
+    # 月曜 10:00 JST = 日曜 01:00 UTC (= 日曜 10:00 JST + 0.5h buffer for PM cron at 09:00 JST)
+    # 別案: 日曜 19:00 JST (= 10:00 UTC) で buyside weekly cron (18:13 JST) 後も captured
+    - cron: '0 10 * * 0'
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Send weekly PM to Slack #weekly-pm
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_WEEKLY }}
+        run: python scripts/send_weekly_pm_to_slack.py

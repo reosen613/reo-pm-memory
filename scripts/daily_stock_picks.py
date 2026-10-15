@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Daily 3 interesting stock picks sent to LINE.
+"""Daily 3 interesting stock picks sent to Slack #stock-picks.
 
 Source: Kabutan /disclosures/ (TDnet corporate disclosures)
 Logic: Score by presence of interesting keywords (業績修正, TOB, 大量保有, 自社株買い 等),
        then pick top 3 (ties broken by recency).
+Env: SLACK_WEBHOOK_URL (= secret SLACK_WEBHOOK_STOCKS at workflow level)
 """
 import os
 import sys
@@ -177,23 +178,21 @@ def categorize(title):
     return ('📄 開示', '')
 
 
-def send_line(token, user_id, message):
+def send_slack(message):
+    url = os.environ.get('SLACK_WEBHOOK_URL')
+    if not url:
+        print('ERROR: SLACK_WEBHOOK_URL env missing')
+        sys.exit(1)
     req = urllib.request.Request(
-        'https://api.line.me/v2/bot/message/push',
-        data=json.dumps({'to': user_id, 'messages': [{'type': 'text', 'text': message}]}).encode('utf-8'),
-        headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+        url,
+        data=json.dumps({'text': message, 'mrkdwn': True}).encode('utf-8'),
+        headers={'Content-Type': 'application/json'},
     )
     with urllib.request.urlopen(req, timeout=15) as r:
         return r.status
 
 
 def main():
-    token = os.environ.get('LINE_TOKEN')
-    user_id = os.environ.get('LINE_USER')
-    if not token or not user_id:
-        print('ERROR: LINE_TOKEN / LINE_USER env missing')
-        sys.exit(1)
-
     now_jst = datetime.now(JST)
     weekday_jp = ['月', '火', '水', '木', '金', '土', '日'][now_jst.weekday()]
     date_str = now_jst.strftime(f'%m/%d({weekday_jp})')
@@ -202,7 +201,7 @@ def main():
         disclosures = fetch_disclosures()
     except Exception as e:
         msg = f'📊 本日 ({date_str}) の 開示注目\n\n⚠️ Kabutan取得エラー: {e}\n\n手動: https://kabutan.jp/disclosures/'
-        send_line(token, user_id, msg)
+        send_slack(msg)
         print('Error path:', e)
         return
 
@@ -226,7 +225,7 @@ def main():
             f'開示データ取得できず (全0件)。\n\n'
             f'手動確認: https://kabutan.jp/disclosures/'
         )
-        send_line(token, user_id, msg)
+        send_slack(msg)
         print('No disclosures at all')
         return
 
@@ -262,7 +261,7 @@ def main():
     lines.append(f'全{len(disclosures)}件: kabutan.jp/disclosures/')
     msg = '\n'.join(lines)
 
-    status = send_line(token, user_id, msg)
+    status = send_slack(msg)
     try:
         print(f'Sent (status {status}):\n{msg}')
     except UnicodeEncodeError:

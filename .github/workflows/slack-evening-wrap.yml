@@ -1,0 +1,23 @@
+name: Slack Evening Wrap
+
+on:
+  schedule:
+    # 20:00 JST = 11:00 UTC. 平日のみ
+    # claude.ai cron (19:37 JST) が briefs/buyside/evening-*.md を push した後
+    - cron: '0 11 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Send evening wrap to Slack #evening-wrap
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_EVENING }}
+        run: python scripts/send_evening_wrap_to_slack.py

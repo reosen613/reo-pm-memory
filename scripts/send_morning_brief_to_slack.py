@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Reads latest Buy-side Morning Brief from briefs/buyside/ and pushes to LINE.
+"""Reads latest Buy-side Morning Brief from briefs/buyside/ and pushes to Slack #morning-brief.
 
 Mobile-optimized summary: watched names + catalysts + macro + today's calendar.
 If brief is older than 24h, warns about stale data.
+Env: SLACK_WEBHOOK_URL (= secret SLACK_WEBHOOK_MORNING at workflow level)
 """
 import os
 import re
@@ -13,7 +14,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 JST = timezone(timedelta(hours=9))
-LINE_MAX_CHARS = 4800
+SLACK_MAX_CHARS = 3500  # Slack has 40k limit but mobile readability ~3500 is sweet spot
 
 
 def find_latest_morning_brief():
@@ -128,28 +129,26 @@ def summarize_for_line(brief_date: str, content: str, stale_days: int) -> str:
     lines.append(f'Full: github.com/reosen613/reo-pm-memory/blob/master/briefs/buyside/morning-{brief_date}.md')
 
     msg = '\n'.join(lines)
-    if len(msg) > LINE_MAX_CHARS:
-        msg = msg[:LINE_MAX_CHARS - 20] + '\n...(truncated)'
+    if len(msg) > SLACK_MAX_CHARS:
+        msg = msg[:SLACK_MAX_CHARS - 20] + '\n...(truncated)'
     return msg
 
 
-def send_line(token: str, user_id: str, message: str) -> int:
+def send_slack(message: str) -> int:
+    url = os.environ.get('SLACK_WEBHOOK_URL')
+    if not url:
+        print('ERROR: SLACK_WEBHOOK_URL env missing')
+        sys.exit(1)
     req = urllib.request.Request(
-        'https://api.line.me/v2/bot/message/push',
-        data=json.dumps({'to': user_id, 'messages': [{'type': 'text', 'text': message}]}).encode('utf-8'),
-        headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token},
+        url,
+        data=json.dumps({'text': message, 'mrkdwn': True}).encode('utf-8'),
+        headers={'Content-Type': 'application/json'},
     )
     with urllib.request.urlopen(req, timeout=15) as r:
         return r.status
 
 
 def main():
-    token = os.environ.get('LINE_TOKEN')
-    user_id = os.environ.get('LINE_USER')
-    if not token or not user_id:
-        print('ERROR: LINE_TOKEN / LINE_USER env missing')
-        sys.exit(1)
-
     now_jst = datetime.now(JST)
     latest = find_latest_morning_brief()
 
@@ -159,7 +158,7 @@ def main():
             f'⚠️ briefs/buyside/ に morning-*.md が見つかりません。\n'
             f'cronが停止している可能性。'
         )
-        send_line(token, user_id, msg)
+        send_slack(msg)
         return
 
     # Parse brief date from filename
@@ -174,7 +173,7 @@ def main():
     content = latest.read_text(encoding='utf-8')
     msg = summarize_for_line(brief_date_str, content, stale_days)
 
-    status = send_line(token, user_id, msg)
+    status = send_slack(msg)
     try:
         print(f'Sent (status {status}, {len(msg)} chars):\n{msg}')
     except UnicodeEncodeError:

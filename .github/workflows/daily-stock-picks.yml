@@ -18,8 +18,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Send daily stock picks
+      - name: Send daily stock picks to Slack #stock-picks
         env:
-          LINE_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
-          LINE_USER: ${{ secrets.LINE_USER_ID }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_STOCKS }}
         run: python scripts/daily_stock_picks.py

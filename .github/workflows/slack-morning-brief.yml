@@ -1,0 +1,23 @@
+name: Slack Morning Brief
+
+on:
+  schedule:
+    # 7:30 JST = 22:30 UTC prev day. 平日のみ
+    # claude.ai cron (06:53 JST) が briefs/buyside/morning-*.md を push した後に実行
+    - cron: '30 22 * * 0-4'
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Send morning brief to Slack #morning-brief
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_MORNING }}
+        run: python scripts/send_morning_brief_to_slack.py
