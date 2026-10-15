@@ -13,6 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from slack_push import send_slack_blocks, header, section, divider, context
+from market_snapshot import build_market_blocks
 
 JST = timezone(timedelta(hours=9))
 SLACK_MAX_CHARS = 3500
@@ -171,6 +172,16 @@ def _wrap_as_blocks(brief_date: str, stale_days: int, text_msg: str, content: st
     # Takeaway at top
     takeaway = _build_evening_takeaway(content)
     blocks.append(section(f'💡 *Today\'s Takeaway*\n{takeaway}'))
+
+    # Market snapshot (live)
+    try:
+        snapshot_blocks = build_market_blocks()
+        if snapshot_blocks:
+            blocks.append(divider())
+            blocks.append(section('*📈 市場概観 (live)*'))
+            blocks.extend(snapshot_blocks)
+    except Exception as e:
+        print(f'market_snapshot failed: {e}')
     buf = ''
     for part in sections_split:
         if part.startswith('【'):

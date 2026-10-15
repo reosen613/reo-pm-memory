@@ -33,13 +33,40 @@ def send_slack_blocks(blocks: list, fallback_text: str = '', webhook_url: str | 
     return _post(payload, webhook_url)
 
 
+import re as _re
+
+
+def mdfix(text: str) -> str:
+    """Convert GitHub/standard markdown to Slack mrkdwn:
+    - **bold** → *bold*
+    - raw markdown table rows (| a | b | c |) → "a | b | c"
+    - trailing/leading whitespace cleanup
+    """
+    if not text:
+        return text
+    # ** → * (Slack bold)
+    text = _re.sub(r'\*\*(.+?)\*\*', r'*\1*', text)
+    # Strip markdown table pipe fences (leading/trailing |)
+    lines = []
+    for ln in text.split('\n'):
+        if ln.strip().startswith('|') and ln.count('|') >= 2 and '---' not in ln:
+            # Convert |a|b|c| to a | b | c
+            cells = [c.strip() for c in ln.strip('|').split('|')]
+            cells = [c for c in cells if c]
+            if cells:
+                lines.append(' | '.join(cells))
+        else:
+            lines.append(ln)
+    return '\n'.join(lines)
+
+
 # Block builders (shorthand)
 def header(text: str) -> dict:
     return {'type': 'header', 'text': {'type': 'plain_text', 'text': text[:150], 'emoji': True}}
 
 
 def section(text: str) -> dict:
-    return {'type': 'section', 'text': {'type': 'mrkdwn', 'text': text[:3000]}}
+    return {'type': 'section', 'text': {'type': 'mrkdwn', 'text': mdfix(text)[:3000]}}
 
 
 def section_fields(fields: list[str]) -> dict:

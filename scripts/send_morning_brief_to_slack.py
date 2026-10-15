@@ -15,6 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from slack_push import send_slack_blocks, header, section, divider, context
+from market_snapshot import build_market_blocks
 
 JST = timezone(timedelta(hours=9))
 SLACK_MAX_CHARS = 3500
@@ -104,6 +105,16 @@ def build_blocks(brief_date: str, content: str, stale_days: int) -> list:
     # Takeaway at top
     takeaway = build_takeaway(sections, content)
     blocks.append(section(f'💡 *Today\'s Takeaway*\n{takeaway}'))
+
+    # Market snapshot (live data via Yahoo Finance)
+    try:
+        snapshot_blocks = build_market_blocks()
+        if snapshot_blocks:
+            blocks.append(divider())
+            blocks.append(section('*📈 市場概観 (live)*'))
+            blocks.extend(snapshot_blocks)
+    except Exception as e:
+        print(f'market_snapshot failed: {e}')
 
     # Overnight US
     us = next((v for k, v in sections.items() if 'Overnight' in k or 'US Close' in k), '')
