@@ -54,13 +54,27 @@ KEYWORD_WEIGHTS = {
     'ToSTNeT': 6, 'PBR': 4, 'ROE': 3,
 }
 
-# Noise to downrank (routine filings)
+# Noise to downrank/filter (routine filings + marketing fluff)
 NOISE_KEYWORDS = {
-    '四半期報告書': -5, '有価証券報告書': -3, '半期報告書': -3,
-    'Financial Results Briefing': -3, 'Integrated Report': -3,
-    'Corporate Governance Report': -3, 'コーポレート・ガバナンス': -3,
-    '定時株主総会': -3, '基準日': -2,
+    # Routine filings
+    '四半期報告書': -10, '有価証券報告書': -8, '半期報告書': -8,
+    'Financial Results Briefing': -8, 'Integrated Report': -8,
+    'Corporate Governance Report': -8, 'コーポレート・ガバナンス': -8,
+    '定時株主総会': -5, '基準日': -3,
+    # IR / Marketing fluff
+    '説明会のお知らせ': -8, '説明会': -5, 'IRTV': -8,
+    'セミナー': -5, 'ウェビナー': -5, 'Live': -3,
+    '個人投資家向け': -5,
+    # PR / Awards
+    '受賞': -8, 'Award': -8, '認定': -5, '表彰': -5, 'Leader': -3,
+    # Reports (not actionable)
+    '提言': -8, 'シナリオ': -5, 'シナリオレポート': -8, 'レポート': -3,
+    # Platform/subsidiary news
+    'サブスク': -3, 'ラインナップ拡充': -5,
 }
+
+# Hard filter: score below this is suppressed (never shown as pick)
+MIN_SCORE_TO_SHOW = 3
 
 
 def fetch_disclosures():
@@ -236,27 +250,70 @@ def main():
         print('Error path:', e)
         return
 
-    # Score all, sort by score (interesting first), fallback to most recent
+    # Score all, dedup by code
     for d in disclosures:
         d['score'] = score_disclosure(d)
     disclosures.sort(key=lambda x: (-x['score'], x['time']), reverse=False)
-
-    # Dedup by code (keep highest-scored per code; English/Japanese pairs for same stock)
     seen = {}
     for d in disclosures:
         if d['code'] not in seen or seen[d['code']]['score'] < d['score']:
             seen[d['code']] = d
     unique = list(seen.values())
     unique.sort(key=lambda x: (-x['score'], x['time']), reverse=False)
-    top3 = unique[:3]
 
-    if not top3:
+    # Apply hard filter: only picks with score >= MIN_SCORE_TO_SHOW
+    qualified = [d for d in unique if d['score'] >= MIN_SCORE_TO_SHOW]
+    top3 = qualified[:3]
+
+    # If < 3 qualified, send "quiet day" message with context + alternative sources
+    if len(top3) < 3:
+        quiet_hour = now_jst.hour < 15  # early in day = probably just slow
+        header_txt = f'📊 開示注目 — {date_str}'
+        if not top3:
+            msg_text = (
+                f'🔇 *静かな日* — 全{len(disclosures)}開示 のうち、 本日の trade angle に値する catalyst なし。\n\n'
+                f'大半 が 事務的 開示 (四半期報告書 / IR説明会 / 受賞 / レポート 等)。\n\n'
+                f'{"午前中なので 15:30 の 2回目 push で 後場 の 開示 (業績修正・TOB 発表 等) を 待つ。" if quiet_hour else "本日 は 大型 catalyst 乏しい の で、 他 source に 移動 推奨。"}'
+            )
+        else:
+            msg_text = (
+                f'🔇 *静かな日* — 全{len(disclosures)}開示 のうち、 有意な picks は {len(top3)}件 のみ。'
+            )
+
         blocks = [
-            header(f'📊 開示注目 — {date_str}'),
-            section('開示データ取得できず (全0件)。\n<https://kabutan.jp/disclosures/|手動確認>'),
+            header(header_txt),
+            section(msg_text),
+            divider(),
+            section(
+                '*🔍 代替 scan 推奨 source*:\n'
+                '• <https://kabutan.jp/warning/|Kabutan 警告・ストップ高/急騰>\n'
+                '• <https://maonline.jp/|M&A Online 大量保有>\n'
+                '• <https://www.jpx.co.jp/listing/measures/alert/index.html|JPX 特別注意銘柄>\n'
+                '• <https://kabutan.jp/disclosures/|Kabutan 全開示>'
+            ),
         ]
-        send_slack_blocks(blocks, fallback_text=f'開示注目 {date_str} (データなし)')
-        print('No disclosures at all')
+        # Show the few that qualified (even if < 3) with full angle
+        for i, d in enumerate(top3):
+            name = d['name'] or '(名称不明)'
+            cat, trade_angle = categorize(d['title'])
+            title = d['title'][:150] + ('…' if len(d['title']) > 150 else '')
+            time_h = d['time'][11:16] if len(d['time']) >= 16 else ''
+            star = '⭐ ' if d['score'] >= 15 else ''
+            rank = ['①', '②', '③'][i]
+
+            blocks.append(divider())
+            blocks.append(section(f'{rank} *{star}{d["code"]} {name}*\n{cat}'))
+            if trade_angle:
+                blocks.append(section(f'🎯 *Trade Angle*\n{trade_angle}'))
+            blocks.append(section(f'📰 {title}'))
+            meta = [f'🕐 {time_h}'] if time_h else []
+            if d['score'] > 0:
+                meta.append(f'📊 score {d["score"]}')
+            meta.append(f'<https://kabutan.jp/stock/?code={d["code"]}|{d["code"]} 個別>')
+            blocks.append(context(meta))
+
+        send_slack_blocks(blocks, fallback_text=f'📊 {date_str} 静かな日')
+        print(f'Quiet day: {len(qualified)} qualified of {len(disclosures)}')
         return
 
     blocks = [
