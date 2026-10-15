@@ -46,8 +46,29 @@ SYMBOLS = [
 ]
 
 
+def _sparkline(values: list[float]) -> str:
+    """Convert list of values to 8-char unicode sparkline."""
+    chars = '▁▂▃▄▅▆▇█'
+    vals = [v for v in values if v is not None]
+    if len(vals) < 2:
+        return '      '  # 6 spaces
+    lo, hi = min(vals), max(vals)
+    rng = hi - lo
+    if rng == 0:
+        return chars[3] * len(vals)
+    out = []
+    for v in values:
+        if v is None:
+            out.append(' ')
+        else:
+            idx = int((v - lo) / rng * (len(chars) - 1))
+            out.append(chars[idx])
+    return ''.join(out)
+
+
 def fetch_one(sym: str, display: str, cat: str) -> dict | None:
-    url = f'https://query1.finance.yahoo.com/v8/finance/chart/{sym}?interval=1d&range=5d'
+    # 30d range for better sparkline trend context
+    url = f'https://query1.finance.yahoo.com/v8/finance/chart/{sym}?interval=1d&range=1mo'
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
     try:
         with urllib.request.urlopen(req, timeout=8) as r:
@@ -55,11 +76,10 @@ def fetch_one(sym: str, display: str, cat: str) -> dict | None:
         result = data.get('chart', {}).get('result', [{}])[0]
         meta = result.get('meta', {})
         close = meta.get('regularMarketPrice')
-        # Use actual previous day close from the series (not chartPreviousClose, which is 5-day lookback)
+        # Use actual previous day close from the series (not chartPreviousClose which can be 5-day lookback)
         closes = result.get('indicators', {}).get('quote', [{}])[0].get('close', [])
         prev = None
         if len(closes) >= 2:
-            # Last valid close before today
             for v in reversed(closes[:-1]):
                 if v is not None:
                     prev = v
@@ -70,9 +90,17 @@ def fetch_one(sym: str, display: str, cat: str) -> dict | None:
             return None
         chg = close - prev
         pct = (chg / prev * 100) if prev else 0.0
+        # Sparkline from last ~20 valid closes
+        valid_closes = [c for c in closes if c is not None][-20:]
+        spark = _sparkline(valid_closes) if len(valid_closes) >= 5 else ''
+        # 1-month change for context
+        pct_1mo = None
+        if len(valid_closes) >= 2:
+            pct_1mo = (valid_closes[-1] - valid_closes[0]) / valid_closes[0] * 100
         return {
             'symbol': sym, 'name': display, 'category': cat,
             'close': close, 'change': chg, 'pct': pct,
+            'spark': spark, 'pct_1mo': pct_1mo,
         }
     except Exception:
         return None
@@ -125,12 +153,12 @@ def _pad(s: str, width: int) -> str:
 
 
 def _format_table_block(items: list) -> str:
-    """Format category items as aligned monospace table.
-    Format: name (padded) | close (right) | 🟢▲+X.XX% / 🔴▼-X.XX% (color-coded)
+    """Format category items as aligned monospace table with trend sparkline.
+    Format: name (padded) | close (right) | 🟢▲+X.XX% / 🔴▼-X.XX% | sparkline (1mo) | 1mo%
     """
     lines = []
     name_w = max((_display_width(s['name']) for s in items), default=10)
-    name_w = max(name_w, 12)  # min width
+    name_w = max(name_w, 12)
 
     for s in items:
         pct = s['pct']
@@ -139,7 +167,7 @@ def _format_table_block(items: list) -> str:
             sign = '+'
         elif pct < -0.1:
             marker = '🔴▼'
-            sign = ''  # negative already has -
+            sign = ''
         else:
             marker = '⚪━'
             sign = '+' if pct >= 0 else ''
@@ -150,7 +178,11 @@ def _format_table_block(items: list) -> str:
         else:
             close_fmt = f'{s["close"]:>10,.3f}'
         pct_fmt = f'{sign}{pct:.2f}%'
-        lines.append(f'{_pad(s["name"], name_w)}  {close_fmt}  {marker} {pct_fmt}')
+        spark = s.get('spark', '')
+        pct_1mo = s.get('pct_1mo')
+        mo_fmt = f'  1m: {pct_1mo:+5.1f}%' if pct_1mo is not None else ''
+        line = f'{_pad(s["name"], name_w)}  {close_fmt}  {marker} {pct_fmt:>8s}  {spark}{mo_fmt}'
+        lines.append(line)
     return '\n'.join(lines)
 
 
