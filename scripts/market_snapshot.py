@@ -37,8 +37,12 @@ SYMBOLS = [
     ('CL=F',   'WTI 原油',        'COM'),
     ('GC=F',   'Gold',            'COM'),
     ('SI=F',   'Silver',          'COM'),
-    # Yields
-    ('^TNX',   '米10年',          'YIELD'),
+    # Yields (US Treasuries)
+    ('^IRX',   '米3M (短期)',      'YIELD'),
+    ('^FVX',   '米5年',            'YIELD'),
+    ('^TNX',   '米10年',           'YIELD'),
+    ('^TYX',   '米30年',           'YIELD'),
+    # 日本10年国債 yield は Yahoo API 対応なし → _append_jgb_note() で別途notice
 ]
 
 
@@ -122,7 +126,7 @@ def _pad(s: str, width: int) -> str:
 
 def _format_table_block(items: list) -> str:
     """Format category items as aligned monospace table.
-    Columns: name (padded) | close (right) | pct% (right, with 🟢🔴 arrow)
+    Format: name (padded) | close (right) | 🟢▲+X.XX% / 🔴▼-X.XX% (color-coded)
     """
     lines = []
     name_w = max((_display_width(s['name']) for s in items), default=10)
@@ -130,15 +134,23 @@ def _format_table_block(items: list) -> str:
 
     for s in items:
         pct = s['pct']
-        arrow = '🟢' if pct > 0.1 else '🔴' if pct < -0.1 else '⚪'
+        if pct > 0.1:
+            marker = '🟢▲'
+            sign = '+'
+        elif pct < -0.1:
+            marker = '🔴▼'
+            sign = ''  # negative already has -
+        else:
+            marker = '⚪━'
+            sign = '+' if pct >= 0 else ''
         if s['close'] >= 10000:
             close_fmt = f'{s["close"]:>10,.0f}'
         elif s['close'] >= 100:
             close_fmt = f'{s["close"]:>10,.2f}'
         else:
             close_fmt = f'{s["close"]:>10,.3f}'
-        pct_fmt = f'{pct:>+7.2f}%'
-        lines.append(f'{arrow} {_pad(s["name"], name_w)}  {close_fmt}  {pct_fmt}')
+        pct_fmt = f'{sign}{pct:.2f}%'
+        lines.append(f'{_pad(s["name"], name_w)}  {close_fmt}  {marker} {pct_fmt}')
     return '\n'.join(lines)
 
 
@@ -174,6 +186,5 @@ if __name__ == '__main__':
         if not items:
             continue
         print(f'=== {CATEGORY_LABELS[cat]} ===')
-        for s in items:
-            print(fmt_snapshot(s))
+        print(_format_table_block(items))
         print()
