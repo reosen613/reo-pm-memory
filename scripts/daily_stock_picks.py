@@ -77,6 +77,32 @@ NOISE_KEYWORDS = {
 MIN_SCORE_TO_SHOW = 3
 
 
+def fetch_company_hp(code: str) -> str | None:
+    """Scrape company HP URL from Kabutan stock page. Return None on failure."""
+    try:
+        req = urllib.request.Request(
+            f'https://kabutan.jp/stock/?code={code}',
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'},
+        )
+        with urllib.request.urlopen(req, timeout=8) as r:
+            html = r.read().decode('utf-8', errors='replace')
+        # Look for external links that match corporate HP pattern (not minkabu/kabutan/ads)
+        exclusions = ('kabutan.jp', 'minkabu.jp', 'google', 'twitter', 'facebook',
+                      'line.me', 'doubleclick', 'cdnjs', 'cloudflare', 'yahoo',
+                      'rakuten.co.jp', 'adserver', 'japannext.co.jp', 'ebis.ne.jp')
+        for m in re.finditer(r'href="(https?://[^"]+)"', html):
+            url = m.group(1)
+            if any(x in url.lower() for x in exclusions):
+                continue
+            # Must look like a corporate HP (short-ish, no query, likely .co.jp/.com/.jp)
+            if any(url.lower().endswith(ext) or url.lower().endswith(ext + '/') for ext in ['.co.jp', '.com', '.jp', '.io']) \
+               and len(url) < 100 and '?' not in url and '&' not in url:
+                return url
+        return None
+    except Exception:
+        return None
+
+
 def fetch_disclosures():
     """Fetch and parse Kabutan disclosures page."""
     req = urllib.request.Request(
@@ -309,7 +335,15 @@ def main():
             meta = [f'🕐 {time_h}'] if time_h else []
             if d['score'] > 0:
                 meta.append(f'📊 score {d["score"]}')
-            meta.append(f'<https://kabutan.jp/stock/?code={d["code"]}|{d["code"]} 個別>')
+            link_parts = [
+                f'<https://kabutan.jp/stock/?code={d["code"]}|📊 Kabutan>',
+                f'<https://minkabu.jp/stock/{d["code"]}|📘 Minkabu>',
+                f'<https://irbank.net/{d["code"]}/|📈 IRBANK>',
+            ]
+            hp = fetch_company_hp(d['code'])
+            if hp:
+                link_parts.append(f'<{hp}|🏢 公式HP>')
+            meta.append(' / '.join(link_parts))
             blocks.append(context(meta))
 
         send_slack_blocks(blocks, fallback_text=f'📊 {date_str} 静かな日')
@@ -341,13 +375,23 @@ def main():
         # Original disclosure (raw title)
         blocks.append(section(f'📰 {title}'))
 
-        # Meta context
+        # Meta context (links to multiple sources)
         meta_elems = []
         if time_h:
             meta_elems.append(f'🕐 {time_h}')
         if d['score'] > 0:
             meta_elems.append(f'📊 score {d["score"]}')
-        meta_elems.append(f'<https://kabutan.jp/stock/?code={d["code"]}|{d["code"]} 個別ページ>')
+        # Standard sources
+        link_parts = [
+            f'<https://kabutan.jp/stock/?code={d["code"]}|📊 Kabutan>',
+            f'<https://minkabu.jp/stock/{d["code"]}|📘 Minkabu>',
+            f'<https://irbank.net/{d["code"]}/|📈 IRBANK>',
+        ]
+        # Try to fetch company HP
+        hp = fetch_company_hp(d['code'])
+        if hp:
+            link_parts.append(f'<{hp}|🏢 公式HP>')
+        meta_elems.append(' / '.join(link_parts))
         blocks.append(context(meta_elems))
 
     blocks.append(divider())
