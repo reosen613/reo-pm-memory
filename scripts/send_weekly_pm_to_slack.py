@@ -110,7 +110,34 @@ def summarize(brief_date: str, content: str, stale_days: int, source: str) -> st
     return msg
 
 
-def _wrap_as_blocks(brief_date: str, stale_days: int, source: str, text_msg: str) -> list:
+def _build_weekly_takeaway(content: str) -> str:
+    """Extract HIGH risk, blockers, and top action from PM/pipeline brief."""
+    lines = []
+
+    # 1. First HIGH risk item (buyside pipeline format)
+    high = re.search(r'(?:🔴|HIGH|高)\s*(?:Stuck|停滞)?.+?\|\s*([^|]+?)\s*\|', content[:3000])
+    if high:
+        lines.append(f'🔴 HIGH risk: {high.group(1).strip()[:120]}')
+
+    # 2. ヘッドライン (PM agent format)
+    headline_match = re.search(r'##\s*ヘッドライン\s*\n+(.+?)(?:\n\n|##)', content, re.DOTALL)
+    if headline_match:
+        txt = re.sub(r'\s+', ' ', headline_match.group(1)).strip()[:200]
+        if txt and not any(txt in l for l in lines):
+            lines.append(f'📌 Headline: {txt}')
+
+    # 3. 今週の必達 - first item
+    week_match = re.search(r'(?:今週の必達|Priority)[^\n]*\n+(?:\d+\.|-)\s*(.+?)(?:\n|$)', content)
+    if week_match:
+        txt = re.sub(r'[\*_]', '', week_match.group(1))[:150]
+        lines.append(f'🎯 最優先: {txt.strip()}')
+
+    if not lines:
+        return 'ヘッドライン抽出失敗。 詳細は本文 scan 推奨。'
+    return '\n'.join(f'• {l}' for l in lines[:3])
+
+
+def _wrap_as_blocks(brief_date: str, stale_days: int, source: str, text_msg: str, content: str) -> list:
     title = f'📅 Weekly PM — {brief_date}'
     if stale_days > 10:
         title += f' ⚠️ {stale_days}日前'
@@ -119,6 +146,9 @@ def _wrap_as_blocks(brief_date: str, stale_days: int, source: str, text_msg: str
     sections_split = re.split(r'(【[^】]+】)', '\n'.join(body_lines))
     blocks = [header(title)]
     blocks.append(context([f'source: `{source}`']))
+    # Takeaway at top
+    takeaway = _build_weekly_takeaway(content)
+    blocks.append(section(f'💡 *Today\'s Takeaway*\n{takeaway}'))
     buf = ''
     for part in sections_split:
         if part.startswith('【'):
@@ -158,7 +188,7 @@ def main():
     source = 'reports/' if 'reports' in str(latest) else 'briefs/buyside/'
     content = latest.read_text(encoding='utf-8')
     text_msg = summarize(brief_date_str, content, stale_days, source)
-    blocks = _wrap_as_blocks(brief_date_str, stale_days, source, text_msg)
+    blocks = _wrap_as_blocks(brief_date_str, stale_days, source, text_msg, content)
 
     status = send_slack_blocks(blocks, fallback_text=f'📅 Weekly PM {brief_date_str}')
     print(f'Sent (status {status}, {len(blocks)} blocks)')

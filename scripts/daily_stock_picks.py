@@ -122,64 +122,102 @@ def score_disclosure(d):
 
 
 def categorize(title):
-    """Return a short category tag + emoji + one-liner interpretation."""
+    """Return (category_tag, trade_angle). Trade angle = what Reo should do/watch."""
     t = title
     # Event-driven (TOB/M&A)
     if any(k in t for k in ['TOB', '公開買付', '非公開化', 'MBO', 'LBO', 'Tender']):
         if '条件等の変更' in t or '価格の変更' in t or 'Amendment' in t:
-            return ('🤝 TOB変更', '買収価格・期限等の条件が変わった → arb対象')
-        return ('🤝 TOB/買収', '公開買付・M&A発表 → event-driven核心')
+            return ('🤝 TOB条件変更', '価格up・期限延長の可能性 → 現在株価と比較してarb spread残っているか即check、残っていれば entry 検討')
+        if '応募' in t or '下限' in t:
+            return ('🤝 TOB応募状況', '応募率で成立確度判定 → 下限超えてれば決済織込みで arb spread 縮小')
+        return ('🤝 TOB発表', 'event-driven核心案件 → premium/discount分析、同業他社の next target 推定')
     if '完全子会社化' in t or '株式交換' in t:
-        return ('🤝 子会社化', '同業・親子上場解消 → +50%プレミアム法則対象')
+        return ('🤝 子会社化', '同業・親子上場解消 → +45-50%プレミアム法則の pattern (レオパレス/フェローテク等と比較)')
     if '合併' in t:
-        return ('🤝 合併', 'シナジー + 支配権変更')
+        return ('🤝 合併', 'シナジー数字 + 新会社の時価総額 + 株式比率で arb check')
     # Activist
     if '大量保有' in t or '活動方針' in t or '重要提案' in t:
         if '5%' in t or '新規' in t:
-            return ('⚔️ Activist新規', '5%超の新規保有 → Day 0 候補')
-        return ('⚔️ Activist', '保有変動・活動方針表明')
+            return ('⚔️ Activist新規', '5%超の新規保有 → Day 0 候補、翌営業日の板で初期反応確認、活動方針欄で「重要提案」有無check')
+        return ('⚔️ Activist変動', '保有pt変化で意図 (ラダー買増 or 利確) → 直前の%と増減幅で判定')
     # Earnings
     if '上方修正' in t or '最高益' in t:
-        return ('📈 業績上振れ', '業績予想の上方修正 → long候補')
+        return ('📈 業績上振れ', 'OP 修正率と要因 (需要/値上げ/コスト) check → 既存 short の thesis challenge 可能性、同業への spillover')
     if '下方修正' in t:
-        return ('📉 業績下振れ', '業績予想の下方修正 → short候補')
+        return ('📉 業績下振れ', 'OP 下方率と要因 → 既存 long の thesis 棄損、同業連鎖で short pair 候補')
     if '業績予想' in t:
-        return ('📊 業績予想', '通期・四半期の業績予想修正')
+        return ('📊 業績予想', '通期・四半期予想修正 → 市場想定とのdeviation check')
     # Capital allocation
     if '自社株買い' in t or '自己株式' in t:
-        return ('💰 自社株買い', '株主還元 → short-term支援')
+        return ('💰 自社株買い', '上限枚数・金額・期間 → 時価総額比%で demand 影響評価、PBR<1なら特に effective')
     if '増配' in t or '記念配当' in t:
-        return ('💰 増配', '配当方針強化')
+        return ('💰 増配', '配当方針 shift → 利回り再計算、株主還元強化トレンド銘柄 scan')
     # Governance red
     if '意見不表明' in t or '限定付適正意見' in t:
-        return ('🚨 監査問題', 'Big4意見不表明 → 特別注意銘柄行き')
+        return ('🚨 監査問題', 'Big4 意見不表明 → 特別注意銘柄行きの前兆 (Schilit三点セット候補)、short entry検討')
     if '不正' in t or '不適切' in t or '疑義' in t:
-        return ('🚨 不正疑義', '会計不正・疑義表明 → short候補')
+        return ('🚨 不正疑義', '会計不正・疑義 → short candidate (エア・ウォーター/電気興業 pattern)、第三者委委員 lineup check')
     if '特別調査委員会' in t or '過年度訂正' in t:
-        return ('🚨 第三者委', '不正調査・過年度訂正')
+        return ('🚨 第三者委', '不正調査開始 → 訂正発表までの期間で短期ショート、監査法人交代と重なれば three-strike')
     if '特別注意' in t or '監理銘柄' in t or '上場廃止' in t:
-        return ('🚨 制裁', 'JPX特別注意・監理・上場廃止')
+        return ('🚨 制裁', 'JPX制裁 → 上場廃止までのタイムライン確認、活動方針変更の持ち分変動と連動check')
     # Capital raise
     if '第三者割当' in t or '新株予約権' in t:
-        return ('💵 増資', '第三者割当・新株予約権 → 希薄化')
+        return ('💵 増資', '発行価格と割引率 → 既存株主希薄化率、調達資金使途が M&A か 事業資金か')
     # Partnership
     if '資本業務提携' in t or '資本提携' in t:
-        return ('🤝 資本提携', '出資・業務提携')
+        return ('🤝 資本提携', '出資比率・金額 → 将来の TOB 発展可能性 (伊藤忠×電通総研 pattern)')
     # English fallbacks
     if 'Issue Price' in t or 'Selling Price' in t:
-        return ('💵 公募価格決定', '公募・売出価格の決定 → IPOか増資')
+        return ('💵 公募価格決定', '公募・売出 price fix → ディスカウント率と需給 impact')
     if 'Capital Investment' in t or '設備投資' in t:
-        return ('🏭 設備投資', '追加設備投資・増産発表')
+        return ('🏭 設備投資', '追加投資額・増産率 → 業界 capex サイクルの位置')
     if 'Share Buyback' in t or 'Buyback' in t:
-        return ('💰 自社株買い (EN)', '英語開示の自社株買い')
+        return ('💰 自社株買い (EN)', '英語開示自社株買い → 国内開示 cross check')
     if 'Dividend' in t:
-        return ('💰 配当関連 (EN)', '英語開示の配当関連')
+        return ('💰 配当関連 (EN)', '英語配当開示 → 利回り再計算')
     if 'Acquisition' in t:
-        return ('🤝 Acquisition (EN)', '英語開示のM&A')
+        return ('🤝 Acquisition (EN)', '英語M&A → 国内公式開示 cross check')
     if 'Earnings' in t or 'Financial Results' in t:
-        return ('📊 決算 (EN)', '英語開示の決算関連')
+        return ('📊 決算 (EN)', '英語決算 → 日本語版の数字 cross check')
     # Default
-    return ('📄 開示', '')
+    return ('📄 開示', '事務的開示 → 他 pick が強ければ skip 可')
+
+
+def build_takeaway(top3: list, total: int) -> str:
+    """Generate a 1-2 sentence takeaway summarizing today's themes."""
+    categories = [categorize(d['title'])[0] for d in top3]
+    themes = []
+    tob_count = sum(1 for c in categories if 'TOB' in c or '子会社' in c or '合併' in c)
+    activist_count = sum(1 for c in categories if 'Activist' in c)
+    earnings_count = sum(1 for c in categories if '業績' in c)
+    gov_count = sum(1 for c in categories if '🚨' in c)
+    capital_count = sum(1 for c in categories if '自社株' in c or '増配' in c or '💵' in c)
+
+    if tob_count >= 2:
+        themes.append(f'TOB/M&A再編 {tob_count}件 (arb機会)')
+    if activist_count >= 1:
+        themes.append(f'Activist動き {activist_count}件 (Day 0 entry候補)')
+    if gov_count >= 1:
+        themes.append(f'ガバナンス red flag {gov_count}件 (short candidate)')
+    if earnings_count >= 2:
+        themes.append(f'業績修正 {earnings_count}件 (thesis再評価)')
+    if capital_count >= 2:
+        themes.append(f'資本政策 {capital_count}件 (需給 catalyst)')
+
+    high_score = top3[0]['score'] if top3 else 0
+    if high_score >= 15:
+        headline = f'⭐ 高score pick あり (score {high_score}) → #1 を優先深掘り'
+    elif high_score >= 7:
+        headline = f'中score picks → #1 の trade angle 確認推奨'
+    else:
+        headline = f'大型 catalyst 乏しい日 → routine filings 中心'
+
+    takeaway = headline
+    if themes:
+        takeaway += '。 本日のテーマ: ' + ' / '.join(themes)
+    takeaway += f' (全{total}開示)'
+    return takeaway
 
 
 def main():
@@ -223,32 +261,37 @@ def main():
 
     blocks = [
         header(f'📊 開示注目3銘柄 — {date_str}'),
+        section(f'💡 *Today\'s Takeaway*\n{build_takeaway(top3, len(disclosures))}'),
     ]
     for i, d in enumerate(top3):
         name = d['name'] or '(名称不明)'
         tag = f'`{d["exchange"]}`' if d['exchange'] else ''
-        title = d['title'][:120] + ('…' if len(d['title']) > 120 else '')
+        title = d['title'][:150] + ('…' if len(d['title']) > 150 else '')
         time_h = d['time'][11:16] if len(d['time']) >= 16 else ''
-        cat, interp = categorize(d['title'])
+        cat, trade_angle = categorize(d['title'])
         star = '⭐ ' if d['score'] >= 15 else ''
+        rank = ['①', '②', '③'][i]
 
-        # Section with headline
-        headline_md = f'*{star}{d["code"]} {name}* {tag}\n{cat}'
-        if interp:
-            headline_md += f'\n→ _{interp}_'
+        # Headline block: ranking + ticker + category
+        headline_md = f'{rank} *{star}{d["code"]} {name}* {tag}\n{cat}'
         blocks.append(divider())
         blocks.append(section(headline_md))
-        # Section with disclosure title
+
+        # Trade angle (the "why Reo should care" part)
+        if trade_angle:
+            blocks.append(section(f'🎯 *Trade Angle*\n{trade_angle}'))
+
+        # Original disclosure (raw title)
         blocks.append(section(f'📰 {title}'))
-        # Context with meta
+
+        # Meta context
         meta_elems = []
         if time_h:
             meta_elems.append(f'🕐 {time_h}')
         if d['score'] > 0:
             meta_elems.append(f'📊 score {d["score"]}')
-        meta_elems.append(f'<https://kabutan.jp/stock/?code={d["code"]}|個別ページ>')
-        if meta_elems:
-            blocks.append(context(meta_elems))
+        meta_elems.append(f'<https://kabutan.jp/stock/?code={d["code"]}|{d["code"]} 個別ページ>')
+        blocks.append(context(meta_elems))
 
     blocks.append(divider())
     blocks.append(context([f'全{len(disclosures)}件: <https://kabutan.jp/disclosures/|kabutan.jp/disclosures/>']))

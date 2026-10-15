@@ -125,7 +125,39 @@ def summarize(brief_date: str, content: str, stale_days: int) -> str:
     return msg
 
 
-def _wrap_as_blocks(brief_date: str, stale_days: int, text_msg: str) -> list:
+def _build_evening_takeaway(content: str) -> str:
+    """Extract key drivers + themes from evening wrap."""
+    lines = []
+
+    # 1. First bullet of Key drivers
+    drivers_match = re.search(r'\*\*Key drivers:\*\*(.+?)(?:\n\n|\*\*Top)', content, re.DOTALL)
+    if drivers_match:
+        first_bullet = re.search(r'^-\s+(.+?)$', drivers_match.group(1), re.MULTILINE)
+        if first_bullet:
+            txt = re.sub(r'\s+', ' ', first_bullet.group(1))[:200]
+            txt = re.sub(r'\*\*', '', txt)  # strip markdown bold
+            lines.append(f'📰 {txt}')
+
+    # 2. Index Nikkei change
+    nikkei_match = re.search(r'Nikkei\s*225\s*\|\s*([\d,]+(?:\.\d+)?)\s*\|\s*([−\-+][\d,.]+)\s*\|\s*\*?\*?([−\-+]\d+\.\d+%)', content)
+    if nikkei_match:
+        lines.append(f'📈 Nikkei {nikkei_match.group(1)} ({nikkei_match.group(3)})')
+
+    # 3. Top decliner (first entry)
+    decliner_section = re.search(r'\*\*Top 5 Decliner.+?\*\*(.+?)(?:\*\*|\n\n)', content, re.DOTALL)
+    if decliner_section:
+        rows = [l for l in decliner_section.group(1).split('\n') if l.strip().startswith('|') and '---' not in l]
+        if len(rows) >= 2:
+            cols = [c.strip() for c in rows[1].strip('|').split('|')]
+            if len(cols) >= 4:
+                lines.append(f'📉 Top decliner: {cols[1]} ({cols[2]}) — {cols[3][:100]}')
+
+    if not lines:
+        return 'routine market close。 詳細セクション scan 推奨。'
+    return '\n'.join(f'• {l}' for l in lines[:3])
+
+
+def _wrap_as_blocks(brief_date: str, stale_days: int, text_msg: str, content: str) -> list:
     """Wrap plain-text summary into Block Kit for Slack rich display."""
     title = f'🌆 Evening Wrap — {brief_date}'
     if stale_days > 1:
@@ -136,6 +168,9 @@ def _wrap_as_blocks(brief_date: str, stale_days: int, text_msg: str) -> list:
     body_lines = [l for l in body.split('\n') if l.strip() and not l.startswith('🌆')]
     sections_split = re.split(r'(【[^】]+】)', '\n'.join(body_lines))
     blocks = [header(title)]
+    # Takeaway at top
+    takeaway = _build_evening_takeaway(content)
+    blocks.append(section(f'💡 *Today\'s Takeaway*\n{takeaway}'))
     buf = ''
     for part in sections_split:
         if part.startswith('【'):
@@ -173,7 +208,7 @@ def main():
 
     content = latest.read_text(encoding='utf-8')
     text_msg = summarize(brief_date_str, content, stale_days)
-    blocks = _wrap_as_blocks(brief_date_str, stale_days, text_msg)
+    blocks = _wrap_as_blocks(brief_date_str, stale_days, text_msg, content)
 
     status = send_slack_blocks(blocks, fallback_text=f'🌆 Evening Wrap {brief_date_str}')
     print(f'Sent (status {status}, {len(blocks)} blocks)')
