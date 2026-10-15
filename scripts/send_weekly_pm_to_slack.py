@@ -12,6 +12,9 @@ import urllib.request
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
+from slack_push import send_slack_blocks, header, section, divider, context
+
 JST = timezone(timedelta(hours=9))
 SLACK_MAX_CHARS = 3500
 
@@ -107,18 +110,30 @@ def summarize(brief_date: str, content: str, stale_days: int, source: str) -> st
     return msg
 
 
-def send_slack(message: str) -> int:
-    url = os.environ.get('SLACK_WEBHOOK_URL')
-    if not url:
-        print('ERROR: SLACK_WEBHOOK_URL env missing')
-        sys.exit(1)
-    req = urllib.request.Request(
-        url,
-        data=json.dumps({'text': message, 'mrkdwn': True}).encode('utf-8'),
-        headers={'Content-Type': 'application/json'},
-    )
-    with urllib.request.urlopen(req, timeout=15) as r:
-        return r.status
+def _wrap_as_blocks(brief_date: str, stale_days: int, source: str, text_msg: str) -> list:
+    title = f'📅 Weekly PM — {brief_date}'
+    if stale_days > 10:
+        title += f' ⚠️ {stale_days}日前'
+    body = re.sub(r'━+\n', '', text_msg)
+    body_lines = [l for l in body.split('\n') if l.strip() and not l.startswith('📅') and not l.startswith('source:')]
+    sections_split = re.split(r'(【[^】]+】)', '\n'.join(body_lines))
+    blocks = [header(title)]
+    blocks.append(context([f'source: `{source}`']))
+    buf = ''
+    for part in sections_split:
+        if part.startswith('【'):
+            if buf.strip():
+                blocks.append(section(buf.strip()[:2900]))
+            blocks.append(divider())
+            buf = f'*{part}*\n'
+        else:
+            buf += part
+    if buf.strip():
+        blocks.append(section(buf.strip()[:2900]))
+    file_path = f'reports/{brief_date}' if source == 'reports/' else f'briefs/buyside/weekly-{brief_date}'
+    blocks.append(divider())
+    blocks.append(context([f'<https://github.com/reosen613/reo-pm-memory/blob/master/{file_path}.md|Full brief on GitHub>']))
+    return blocks
 
 
 def main():
@@ -126,8 +141,10 @@ def main():
     latest = find_latest()
 
     if not latest:
-        msg = f'📅 Weekly PM ({now_jst.strftime("%m/%d")})\n\n⚠️ reports/weekly-*.md または briefs/buyside/weekly-*.md が見つかりません。'
-        send_slack(msg)
+        send_slack_blocks([
+            header(f'📅 Weekly PM — {now_jst.strftime("%m/%d")}'),
+            section('⚠️ reports/weekly-*.md または briefs/buyside/weekly-*.md が見つかりません。'),
+        ], fallback_text='Weekly PM missing')
         return
 
     m = re.match(r'weekly-(\d{4}-\d{2}-\d{2})\.md', latest.name)
@@ -140,13 +157,11 @@ def main():
 
     source = 'reports/' if 'reports' in str(latest) else 'briefs/buyside/'
     content = latest.read_text(encoding='utf-8')
-    msg = summarize(brief_date_str, content, stale_days, source)
+    text_msg = summarize(brief_date_str, content, stale_days, source)
+    blocks = _wrap_as_blocks(brief_date_str, stale_days, source, text_msg)
 
-    status = send_slack(msg)
-    try:
-        print(f'Sent (status {status}, {len(msg)} chars):\n{msg}')
-    except UnicodeEncodeError:
-        print(f'Sent (status {status}, {len(msg)} chars)')
+    status = send_slack_blocks(blocks, fallback_text=f'📅 Weekly PM {brief_date_str}')
+    print(f'Sent (status {status}, {len(blocks)} blocks)')
 
 
 if __name__ == '__main__':

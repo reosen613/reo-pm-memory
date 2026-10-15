@@ -14,6 +14,10 @@ import urllib.request
 import urllib.error
 from datetime import datetime, timezone, timedelta
 from html import unescape
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from slack_push import send_slack, send_slack_blocks, header, section, section_fields, divider, context
 
 JST = timezone(timedelta(hours=9))
 
@@ -178,20 +182,6 @@ def categorize(title):
     return ('📄 開示', '')
 
 
-def send_slack(message):
-    url = os.environ.get('SLACK_WEBHOOK_URL')
-    if not url:
-        print('ERROR: SLACK_WEBHOOK_URL env missing')
-        sys.exit(1)
-    req = urllib.request.Request(
-        url,
-        data=json.dumps({'text': message, 'mrkdwn': True}).encode('utf-8'),
-        headers={'Content-Type': 'application/json'},
-    )
-    with urllib.request.urlopen(req, timeout=15) as r:
-        return r.status
-
-
 def main():
     now_jst = datetime.now(JST)
     weekday_jp = ['月', '火', '水', '木', '金', '土', '日'][now_jst.weekday()]
@@ -200,8 +190,11 @@ def main():
     try:
         disclosures = fetch_disclosures()
     except Exception as e:
-        msg = f'📊 本日 ({date_str}) の 開示注目\n\n⚠️ Kabutan取得エラー: {e}\n\n手動: https://kabutan.jp/disclosures/'
-        send_slack(msg)
+        blocks = [
+            header(f'📊 開示注目 — {date_str}'),
+            section(f'⚠️ *Kabutan取得エラー*: {e}\n\n<https://kabutan.jp/disclosures/|手動で開示一覧を確認>'),
+        ]
+        send_slack_blocks(blocks, fallback_text=f'開示注目エラー {date_str}')
         print('Error path:', e)
         return
 
@@ -220,48 +213,48 @@ def main():
     top3 = unique[:3]
 
     if not top3:
-        msg = (
-            f'📊 本日 ({date_str}) の 開示注目\n\n'
-            f'開示データ取得できず (全0件)。\n\n'
-            f'手動確認: https://kabutan.jp/disclosures/'
-        )
-        send_slack(msg)
+        blocks = [
+            header(f'📊 開示注目 — {date_str}'),
+            section('開示データ取得できず (全0件)。\n<https://kabutan.jp/disclosures/|手動確認>'),
+        ]
+        send_slack_blocks(blocks, fallback_text=f'開示注目 {date_str} (データなし)')
         print('No disclosures at all')
         return
 
-    nums = ['1️⃣', '2️⃣', '3️⃣']
-    lines = [
-        '━━━━━━━━━━━━━━',
-        f'📊 {date_str} 開示注目3銘柄',
-        '━━━━━━━━━━━━━━',
-        '',
+    blocks = [
+        header(f'📊 開示注目3銘柄 — {date_str}'),
     ]
     for i, d in enumerate(top3):
         name = d['name'] or '(名称不明)'
-        tag = f'[{d["exchange"]}]' if d['exchange'] else ''
-        title = d['title'][:85] + ('…' if len(d['title']) > 85 else '')
+        tag = f'`{d["exchange"]}`' if d['exchange'] else ''
+        title = d['title'][:120] + ('…' if len(d['title']) > 120 else '')
         time_h = d['time'][11:16] if len(d['time']) >= 16 else ''
         cat, interp = categorize(d['title'])
         star = '⭐ ' if d['score'] >= 15 else ''
 
-        lines.append(f'{nums[i]} {star}{d["code"]} {name} {tag}')
-        lines.append(f'   {cat}')
+        # Section with headline
+        headline_md = f'*{star}{d["code"]} {name}* {tag}\n{cat}'
         if interp:
-            lines.append(f'   → {interp}')
-        lines.append(f'   📰 {title}')
-        meta = []
+            headline_md += f'\n→ _{interp}_'
+        blocks.append(divider())
+        blocks.append(section(headline_md))
+        # Section with disclosure title
+        blocks.append(section(f'📰 {title}'))
+        # Context with meta
+        meta_elems = []
         if time_h:
-            meta.append(f'🕐 {time_h}')
+            meta_elems.append(f'🕐 {time_h}')
         if d['score'] > 0:
-            meta.append(f'📊 score {d["score"]}')
-        if meta:
-            lines.append(f'   {" | ".join(meta)}')
-        lines.append('')
-    lines.append('━━━━━━━━━━━━━━')
-    lines.append(f'全{len(disclosures)}件: kabutan.jp/disclosures/')
-    msg = '\n'.join(lines)
+            meta_elems.append(f'📊 score {d["score"]}')
+        meta_elems.append(f'<https://kabutan.jp/stock/?code={d["code"]}|個別ページ>')
+        if meta_elems:
+            blocks.append(context(meta_elems))
 
-    status = send_slack(msg)
+    blocks.append(divider())
+    blocks.append(context([f'全{len(disclosures)}件: <https://kabutan.jp/disclosures/|kabutan.jp/disclosures/>']))
+
+    status = send_slack_blocks(blocks, fallback_text=f'📊 開示注目3銘柄 {date_str}')
+    msg = f'Blocks sent ({len(blocks)} blocks)'
     try:
         print(f'Sent (status {status}):\n{msg}')
     except UnicodeEncodeError:

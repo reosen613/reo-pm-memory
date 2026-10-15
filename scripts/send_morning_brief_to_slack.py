@@ -13,8 +13,11 @@ import urllib.request
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
+from slack_push import send_slack_blocks, header, section, divider, context
+
 JST = timezone(timedelta(hours=9))
-SLACK_MAX_CHARS = 3500  # Slack has 40k limit but mobile readability ~3500 is sweet spot
+SLACK_MAX_CHARS = 3500
 
 
 def find_latest_morning_brief():
@@ -52,86 +55,75 @@ def extract_rows_from_table(block: str) -> list[str]:
     return rows[1:] if len(rows) >= 2 else []
 
 
-def summarize_for_line(brief_date: str, content: str, stale_days: int) -> str:
+def build_blocks(brief_date: str, content: str, stale_days: int) -> list:
     sections = extract_sections(content)
-    lines = []
+    blocks = []
 
-    header = f'🌅 Morning Brief {brief_date}'
+    title = f'🌅 Morning Brief — {brief_date}'
     if stale_days > 1:
-        header += f' ⚠️{stale_days}日前'
-    lines.append('━' * 14)
-    lines.append(header)
-    lines.append('━' * 14)
-    lines.append('')
+        title += f' ⚠️ {stale_days}日前'
+    blocks.append(header(title))
 
-    # Overnight US (top line + key drivers 1-2 sentences)
-    us = sections.get('Overnight US Close (Mon Jun 22)') or next(
-        (v for k, v in sections.items() if 'Overnight' in k or 'US Close' in k), ''
-    )
+    # Overnight US
+    us = next((v for k, v in sections.items() if 'Overnight' in k or 'US Close' in k), '')
     if us:
-        lines.append('【Overnight US】')
         drivers = re.search(r'\*\*Key drivers:\*\*\s*(.+?)(?:\n\n|\*\*Flagged|$)', us, re.DOTALL)
         if drivers:
-            txt = drivers.group(1).strip()
-            txt = re.sub(r'\s+', ' ', txt)[:400]
-            lines.append(txt)
-        else:
-            table_rows = extract_rows_from_table(us)[:3]
-            for r in table_rows:
-                lines.append(r)
-        lines.append('')
+            txt = re.sub(r'\s+', ' ', drivers.group(1).strip())[:600]
+            blocks.append(divider())
+            blocks.append(section(f'*🌙 Overnight US*\n{txt}'))
 
     # Japan Pre-Market
-    jp = next((v for k, v in sections.items() if 'Japan Pre-Market' in k or 'Japan' in k and 'Signals' in k), '')
+    jp = next((v for k, v in sections.items() if 'Japan Pre-Market' in k or ('Japan' in k and 'Signal' in k)), '')
     if jp:
-        lines.append('【Japan Pre-Market】')
-        bullets = re.findall(r'^-\s+(.+)$', jp, re.MULTILINE)
-        for b in bullets[:3]:
-            lines.append(f'• {b.strip()[:150]}')
-        lines.append('')
+        bullets = re.findall(r'^-\s+(.+)$', jp, re.MULTILINE)[:3]
+        if bullets:
+            body = '\n'.join(f'• {b.strip()[:200]}' for b in bullets)
+            blocks.append(divider())
+            blocks.append(section(f'*🇯🇵 Japan Pre-Market*\n{body}'))
 
-    # Watched Names (most actionable section)
+    # Watched Names
     wn = next((v for k, v in sections.items() if 'Watched Names' in k or '銘柄' in k), '')
     if wn:
-        lines.append('【注目銘柄】')
         rows = extract_rows_from_table(wn)
-        for r in rows[:4]:
-            cols = [c.strip() for c in r.strip('|').split('|')]
-            if len(cols) >= 5:
-                ticker, name, headline, _, implication = cols[0], cols[1], cols[2], cols[3], cols[4]
-                lines.append(f'▸ {ticker} {name}')
-                lines.append(f'  {headline[:120]}')
-                if implication:
-                    lines.append(f'  → {implication[:100]}')
-        lines.append('')
+        if rows:
+            blocks.append(divider())
+            blocks.append(section('*📌 注目銘柄*'))
+            for r in rows[:4]:
+                cols = [c.strip() for c in r.strip('|').split('|')]
+                if len(cols) >= 5:
+                    ticker, name, headline, _, implication = cols[0], cols[1], cols[2], cols[3], cols[4]
+                    body = f'*{ticker} {name}*\n{headline[:150]}'
+                    if implication:
+                        body += f'\n→ _{implication[:120]}_'
+                    blocks.append(section(body))
 
     # Today's Calendar
     cal = next((v for k, v in sections.items() if 'Calendar' in k or '予定' in k), '')
     if cal:
-        lines.append('【Today Calendar】')
         rows = extract_rows_from_table(cal)
-        for r in rows[:3]:
-            cols = [c.strip() for c in r.strip('|').split('|')]
-            if len(cols) >= 2:
-                lines.append(f'• {cols[0]}: {cols[1][:100]}')
-        lines.append('')
+        if rows:
+            cal_lines = []
+            for r in rows[:3]:
+                cols = [c.strip() for c in r.strip('|').split('|')]
+                if len(cols) >= 2:
+                    cal_lines.append(f'• *{cols[0]}* — {cols[1][:120]}')
+            if cal_lines:
+                blocks.append(divider())
+                blocks.append(section('*📅 Today Calendar*\n' + '\n'.join(cal_lines)))
 
-    # EDINET / Activist Filings (brief)
+    # EDINET
     ed = next((v for k, v in sections.items() if 'EDINET' in k or 'Activist' in k), '')
     if ed:
         first_line = next((l for l in ed.split('\n') if l.strip() and not l.startswith('#')), '')
         if first_line:
-            lines.append('【EDINET】')
-            lines.append(first_line.strip()[:200])
-            lines.append('')
+            blocks.append(divider())
+            blocks.append(section(f'*🔍 EDINET*\n{first_line.strip()[:250]}'))
 
-    lines.append('━' * 14)
-    lines.append(f'Full: github.com/reosen613/reo-pm-memory/blob/master/briefs/buyside/morning-{brief_date}.md')
+    blocks.append(divider())
+    blocks.append(context([f'<https://github.com/reosen613/reo-pm-memory/blob/master/briefs/buyside/morning-{brief_date}.md|Full brief on GitHub>']))
 
-    msg = '\n'.join(lines)
-    if len(msg) > SLACK_MAX_CHARS:
-        msg = msg[:SLACK_MAX_CHARS - 20] + '\n...(truncated)'
-    return msg
+    return blocks
 
 
 def send_slack(message: str) -> int:
@@ -171,13 +163,10 @@ def main():
     stale_days = (now_jst.date() - brief_date.date()).days
 
     content = latest.read_text(encoding='utf-8')
-    msg = summarize_for_line(brief_date_str, content, stale_days)
+    blocks = build_blocks(brief_date_str, content, stale_days)
 
-    status = send_slack(msg)
-    try:
-        print(f'Sent (status {status}, {len(msg)} chars):\n{msg}')
-    except UnicodeEncodeError:
-        print(f'Sent (status {status}, {len(msg)} chars): [non-ASCII]')
+    status = send_slack_blocks(blocks, fallback_text=f'🌅 Morning Brief {brief_date_str}')
+    print(f'Sent (status {status}, {len(blocks)} blocks)')
 
 
 if __name__ == '__main__':
