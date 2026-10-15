@@ -14,6 +14,9 @@ on:
     - cron: '0 22 29 10 *'  # 10/30 07:00 JST  CHP立会
     - cron: '0 22 30 10 *'  # 10/31 07:00 JST  JPM退職
     - cron: '0 22 31 10 *'  # 11/01 07:00 JST  Camphora入社
+    - cron: '0 1 20 10 *'   # 10/20 10:00 JST  引越し業者 selection deadline
+    - cron: '0 0 5 11 *'    # 11/05 09:00 JST  退職後 事務 week 1
+    - cron: '0 0 15 11 *'   # 11/15 09:00 JST  新住居 申込 deadline
   workflow_dispatch:
 
 jobs:
