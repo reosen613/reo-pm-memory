@@ -87,14 +87,6 @@ def fetch_all() -> dict:
     return results
 
 
-def fmt_snapshot(s: dict) -> str:
-    """Format one snapshot as 1-line Slack mrkdwn."""
-    pct = s['pct']
-    arrow = '🟢' if pct > 0.1 else '🔴' if pct < -0.1 else '⚪'
-    close_fmt = f'{s["close"]:,.2f}' if s['close'] < 10000 else f'{s["close"]:,.0f}'
-    return f'{arrow} *{s["name"]}* `{close_fmt}` ({pct:+.2f}%)'
-
-
 CATEGORY_LABELS = {
     'US': '🇺🇸 米国株',
     'JP': '🇯🇵 日本株',
@@ -108,9 +100,51 @@ CATEGORY_LABELS = {
 CATEGORY_ORDER = ['US', 'JP', 'EU', 'ASIA', 'FX', 'COM', 'YIELD']
 
 
+def _display_width(s: str) -> int:
+    """Approximate display width (CJK chars = 2, others = 1)."""
+    w = 0
+    for ch in s:
+        # Common full-width ranges (CJK, Hiragana, Katakana, full-width punct)
+        if (0x3000 <= ord(ch) <= 0x9FFF) or (0xFF00 <= ord(ch) <= 0xFFEF):
+            w += 2
+        else:
+            w += 1
+    return w
+
+
+def _pad(s: str, width: int) -> str:
+    """Pad string with spaces to visual width."""
+    cur = _display_width(s)
+    if cur >= width:
+        return s
+    return s + ' ' * (width - cur)
+
+
+def _format_table_block(items: list) -> str:
+    """Format category items as aligned monospace table.
+    Columns: name (padded) | close (right) | pct% (right, with 🟢🔴 arrow)
+    """
+    lines = []
+    name_w = max((_display_width(s['name']) for s in items), default=10)
+    name_w = max(name_w, 12)  # min width
+
+    for s in items:
+        pct = s['pct']
+        arrow = '🟢' if pct > 0.1 else '🔴' if pct < -0.1 else '⚪'
+        if s['close'] >= 10000:
+            close_fmt = f'{s["close"]:>10,.0f}'
+        elif s['close'] >= 100:
+            close_fmt = f'{s["close"]:>10,.2f}'
+        else:
+            close_fmt = f'{s["close"]:>10,.3f}'
+        pct_fmt = f'{pct:>+7.2f}%'
+        lines.append(f'{arrow} {_pad(s["name"], name_w)}  {close_fmt}  {pct_fmt}')
+    return '\n'.join(lines)
+
+
 def build_market_blocks(title_prefix: str = '📈 市場概観') -> list:
-    """Build a list of Slack Block Kit items for the full market snapshot."""
-    from slack_push import header, section, divider
+    """Build Slack Block Kit items: category sections with monospace code block."""
+    from slack_push import section
 
     data = fetch_all()
     blocks = []
@@ -119,9 +153,18 @@ def build_market_blocks(title_prefix: str = '📈 市場概観') -> list:
         if not items:
             continue
         label = CATEGORY_LABELS[cat]
-        lines = [fmt_snapshot(s) for s in items]
-        blocks.append(section(f'*{label}*\n' + '\n'.join(lines)))
+        table = _format_table_block(items)
+        # Use ```code``` for monospace alignment
+        blocks.append(section(f'*{label}*\n```\n{table}\n```'))
     return blocks
+
+
+def fmt_snapshot(s: dict) -> str:
+    """Legacy inline format (kept for test / debug use)."""
+    pct = s['pct']
+    arrow = '🟢' if pct > 0.1 else '🔴' if pct < -0.1 else '⚪'
+    close_fmt = f'{s["close"]:,.2f}' if s['close'] < 10000 else f'{s["close"]:,.0f}'
+    return f'{arrow} *{s["name"]}* `{close_fmt}` ({pct:+.2f}%)'
 
 
 if __name__ == '__main__':

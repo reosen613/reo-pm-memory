@@ -39,25 +39,51 @@ import re as _re
 def mdfix(text: str) -> str:
     """Convert GitHub/standard markdown to Slack mrkdwn:
     - **bold** → *bold*
-    - raw markdown table rows (| a | b | c |) → "a | b | c"
-    - trailing/leading whitespace cleanup
+    - 2+ consecutive markdown table rows → wrapped in ``` code block (aligned columns)
+    - single table rows → `cells joined with " | "`
+    - skip --- separator rows
     """
     if not text:
         return text
     # ** → * (Slack bold)
     text = _re.sub(r'\*\*(.+?)\*\*', r'*\1*', text)
-    # Strip markdown table pipe fences (leading/trailing |)
-    lines = []
-    for ln in text.split('\n'):
-        if ln.strip().startswith('|') and ln.count('|') >= 2 and '---' not in ln:
-            # Convert |a|b|c| to a | b | c
-            cells = [c.strip() for c in ln.strip('|').split('|')]
-            cells = [c for c in cells if c]
-            if cells:
-                lines.append(' | '.join(cells))
+
+    lines = text.split('\n')
+    # First pass: parse table rows into cell arrays
+    def _is_table_row(ln: str) -> bool:
+        s = ln.strip()
+        return s.startswith('|') and s.count('|') >= 2 and '---' not in s
+
+    # Collect consecutive table-row runs
+    out = []
+    i = 0
+    while i < len(lines):
+        if _is_table_row(lines[i]):
+            run = []
+            while i < len(lines) and (_is_table_row(lines[i]) or '---' in lines[i]):
+                if '---' not in lines[i]:
+                    cells = [c.strip() for c in lines[i].strip().strip('|').split('|')]
+                    cells = [c for c in cells if c]
+                    if cells:
+                        run.append(cells)
+                i += 1
+            if len(run) >= 2:
+                # Wrap in code block with aligned columns
+                n_cols = max(len(r) for r in run)
+                # Normalize: pad shorter rows
+                for r in run:
+                    while len(r) < n_cols:
+                        r.append('')
+                # Column widths
+                col_w = [max(len(r[c]) for r in run) for c in range(n_cols)]
+                aligned = ['  '.join(r[c].ljust(col_w[c]) for c in range(n_cols)) for r in run]
+                out.append('```\n' + '\n'.join(aligned) + '\n```')
+            elif len(run) == 1:
+                out.append(' | '.join(run[0]))
         else:
-            lines.append(ln)
-    return '\n'.join(lines)
+            out.append(lines[i])
+            i += 1
+    return '\n'.join(out)
 
 
 # Block builders (shorthand)
