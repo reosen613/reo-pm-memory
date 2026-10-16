@@ -186,6 +186,15 @@ def main():
     stale_days = (now_jst.date() - brief_date.date()).days
 
     source = 'reports/' if 'reports' in str(latest) else 'briefs/buyside/'
+    if stale_days > 10:
+        # 古いレポートを毎回流さない（2026-10-16 Reo: 6/22 のフジクラの話が毎日出ていた）
+        send_slack_blocks([
+            header(f'📅 Weekly PM — {now_jst.strftime("%m/%d")}'),
+            section(f'新しい週次レポートがありません（最新は {brief_date_str}、{stale_days}日前）。週次PMの定期実行が止まっている可能性があるので、Claude アプリの「ルーティン」を確認してください。'),
+            context([f'<https://github.com/reosen613/reo-pm-memory/blob/master/{source}weekly-{brief_date_str}.md|最新のレポート>']),
+        ], fallback_text=f'Weekly PM: 新しいレポートなし（最新 {brief_date_str}）')
+        print(f'stale ({stale_days}d): sent short notice only')
+        return
     content = latest.read_text(encoding='utf-8')
     text_msg = summarize(brief_date_str, content, stale_days, source)
     blocks = _wrap_as_blocks(brief_date_str, stale_days, source, text_msg, content)
