@@ -103,15 +103,19 @@ def fetch_company_hp(code: str) -> str | None:
         return None
 
 
-def fetch_disclosures():
-    """Fetch and parse Kabutan disclosures page."""
-    req = urllib.request.Request(
-        'https://kabutan.jp/disclosures/',
-        headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'},
-    )
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8',
+    'Referer': 'https://kabutan.jp/',
+}
+
+
+def _fetch_kabutan():
+    """Kabutan disclosures page (blocked with 405 from some datacenter IPs)."""
+    req = urllib.request.Request('https://kabutan.jp/disclosures/', headers=HEADERS)
     with urllib.request.urlopen(req, timeout=20) as r:
         html = r.read().decode('utf-8', errors='replace')
-
     rows = re.findall(r'<tr[^>]*>(.*?)</tr>', html, re.DOTALL)
     results = []
     for row in rows:
@@ -121,30 +125,74 @@ def fetch_disclosures():
         code = code_m.group(1)
         if code == '0000':
             continue
-
-        # Extract stock name (first <th class="tal"> after code)
         name_m = re.search(r'<th\s+scope="row"\s+class="tal">([^<]+)</th>', row)
         name = unescape(name_m.group(1).strip()) if name_m else ''
-
-        # Extract disclosure title (link text to PDF)
         title_m = re.search(r'target="pdf">([^<]+)(?:<img|</a>)', row)
         title = unescape(title_m.group(1).strip()) if title_m else ''
-        # Clean up trailing numbers like "2026"
         title = re.sub(r'\s*20\d\d\s*$', '', title)
-
-        # Extract timestamp
         time_m = re.search(r'<time[^>]*datetime="([^"]+)"', row)
         time_iso = time_m.group(1) if time_m else ''
-
-        # Exchange & category (optional)
         exch_m = re.search(r'<td\s+class="tac">([東名福札]証?[PGSNPro]+)</td>', row)
         exchange = exch_m.group(1) if exch_m else ''
+        results.append({'code': code, 'name': name, 'title': title, 'time': time_iso, 'exchange': exchange})
+    return results
 
-        results.append({
-            'code': code, 'name': name, 'title': title,
-            'time': time_iso, 'exchange': exchange,
-        })
 
+def _fetch_tdnet_day(day):
+    """TDnet (JPX) daily list: I_list_001_YYYYMMDD.html ... (100 rows per page)."""
+    out = []
+    for page in range(1, 15):
+        url = f'https://www.release.tdnet.info/inbs/I_list_{page:03d}_{day:%Y%m%d}.html'
+        req = urllib.request.Request(url, headers={**HEADERS, 'Referer': 'https://www.release.tdnet.info/inbs/I_main_00.html'})
+        try:
+            with urllib.request.urlopen(req, timeout=20) as r:
+                html = r.read().decode('utf-8', errors='replace')
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                break
+            raise
+        rows = re.findall(r'<tr[^>]*>(.*?)</tr>', html, re.DOTALL)
+        n = 0
+        for row in rows:
+            code_m = re.search(r'class="[^"]*kjCode"[^>]*>\s*(\d{4})\d?\s*<', row)
+            if not code_m:
+                continue
+            name_m = re.search(r'class="[^"]*kjName"[^>]*>([^<]*)<', row)
+            title_m = re.search(r'class="[^"]*kjTitle"[^>]*>\s*<a[^>]*>([^<]+)</a>', row)
+            time_m = re.search(r'class="[^"]*kjTime"[^>]*>\s*(\d{1,2}:\d{2})', row)
+            place_m = re.search(r'class="[^"]*kjPlace"[^>]*>([^<]*)<', row)
+            out.append({
+                'code': code_m.group(1),
+                'name': unescape(name_m.group(1)).strip() if name_m else '',
+                'title': unescape(title_m.group(1)).strip() if title_m else '',
+                'time': f'{day:%Y-%m-%d}T{time_m.group(1)}' if time_m else f'{day:%Y-%m-%d}',
+                'exchange': (place_m.group(1).strip() if place_m else ''),
+            })
+            n += 1
+        if n == 0 or not re.search(rf'I_list_{page + 1:03d}_', html):
+            break
+    return out
+
+
+def fetch_disclosures():
+    """Kabutan first; if it is blocked (405 etc.), fall back to TDnet (today + previous business day)."""
+    try:
+        res = _fetch_kabutan()
+        if res:
+            return res
+    except Exception as e:
+        print('kabutan failed, falling back to TDnet:', e)
+    now = datetime.now(JST)
+    days = [now.date()]
+    prev = now.date() - timedelta(days=1)
+    while prev.weekday() >= 5:
+        prev -= timedelta(days=1)
+    days.append(prev)
+    results = []
+    for d in days:
+        results.extend(_fetch_tdnet_day(d))
+    if not results:
+        raise RuntimeError('TDnet からも取得できませんでした')
     return results
 
 
