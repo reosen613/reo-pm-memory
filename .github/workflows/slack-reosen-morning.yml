@@ -1,0 +1,20 @@
+name: Slack Reosen Morning (銘柄研究帳)
+
+on:
+  schedule:
+    # 07:10 JST = 22:10 UTC 前日。平日のみ。claude.ai のクラウドルーティン（06:50 JST）が briefs/reosen/morning-*.md を push した後
+    - cron: '10 22 * * 0-4'
+  workflow_dispatch:
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Send Reosen morning brief to Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_KENKYU || secrets.SLACK_WEBHOOK_MORNING }}
+        run: python scripts/send_reosen_morning_to_slack.py
