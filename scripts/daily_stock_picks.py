@@ -111,6 +111,63 @@ HEADERS = {
 }
 
 
+# --- どういう会社か（毎回の通知に入れる。Reo 2026-10-21/22「毎回どういう会社か入るようにして」） ---
+_BASICS = None
+
+
+def load_basics() -> dict:
+    """data/company_basics.json: 全上場3,707社の業種・市場・時価総額・四季報2026秋の見出しとコメント（銘柄研究帳 universe.json から生成）。無ければ空。"""
+    global _BASICS
+    if _BASICS is None:
+        try:
+            import json as _json
+            _BASICS = _json.loads((Path(__file__).parent.parent / 'data' / 'company_basics.json').read_text(encoding='utf-8'))
+        except Exception:
+            _BASICS = {}
+    return _BASICS
+
+
+def _fetch_minkabu_profile(code: str) -> str | None:
+    """みんかぶの銘柄ページの description から事業の1行を拾う（取れなければ None）。"""
+    try:
+        req = urllib.request.Request(f'https://minkabu.jp/stock/{code}', headers=HEADERS)
+        with urllib.request.urlopen(req, timeout=8) as r:
+            html = r.read().decode('utf-8', errors='replace')
+        m = re.search(r'<meta name="description" content="([^"]{20,400})"', html)
+        if m:
+            t = re.sub(r'\s+', ' ', m.group(1)).strip()
+            return t[:160]
+    except Exception:
+        pass
+    return None
+
+
+def company_overview(code: str) -> str:
+    """Slack に出す『どういう会社か』: 業種・市場・時価総額、四季報の見出しとコメント（前半）、予想PER・EPS・配当。"""
+    b = load_basics().get(code) or {}
+    parts = []
+    mc = (b.get('mcap') or 0) * 100  # universe.json の mcap は百億円単位
+    head = ' / '.join(x for x in [b.get('s33'), b.get('mkt'), (f"時価総額{mc:,.0f}億" if mc >= 10 else (f"時価総額{mc:.1f}億" if mc > 0 else None))] if x)
+    if head:
+        parts.append(head)
+    if b.get('hd') or b.get('cm'):
+        cm = (b.get('cm') or '')[:110]
+        parts.append(f"四季報: {cm}" if cm.startswith('【') else f"四季報: 【{b.get('hd') or '-'}】{cm}")
+    nums = []
+    if b.get('per'):
+        nums.append(f"予想PER {b['per']}倍")
+    if b.get('eps'):
+        nums.append(f"予想EPS {b['eps']:,.0f}円")
+    if b.get('dps'):
+        nums.append(f"配当 {b['dps']:,.0f}円")
+    if nums:
+        parts.append('・'.join(nums))
+    if not parts:
+        mk = _fetch_minkabu_profile(code)
+        parts.append(mk or '概要を取得できず（株探・みんかぶのリンクから確認）')
+    return '\n'.join(parts)
+
+
 def _fetch_kabutan():
     """Kabutan disclosures page (blocked with 405 from some datacenter IPs)."""
     req = urllib.request.Request('https://kabutan.jp/disclosures/', headers=HEADERS)
@@ -377,6 +434,7 @@ def main():
 
             blocks.append(divider())
             blocks.append(section(f'{rank} *{star}{d["code"]} {name}*\n{cat}'))
+            blocks.append(section(f'🏢 *どういう会社*\n{company_overview(d["code"])}'))
             if trade_angle:
                 blocks.append(section(f'🎯 *Trade Angle*\n{trade_angle}'))
             blocks.append(section(f'📰 {title}'))
@@ -415,6 +473,7 @@ def main():
         headline_md = f'{rank} *{star}{d["code"]} {name}* {tag}\n{cat}'
         blocks.append(divider())
         blocks.append(section(headline_md))
+        blocks.append(section(f'🏢 *どういう会社*\n{company_overview(d["code"])}'))
 
         # Trade angle (the "why Reo should care" part)
         if trade_angle:
